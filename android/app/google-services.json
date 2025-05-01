@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1074524553129",
+    "project_id": "cropcure-8f7f5",
+    "storage_bucket": "cropcure-8f7f5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1074524553129:android:3c43d3088fca27a5d10eb8",
+        "android_client_info": {
+          "package_name": "com.example.cropcure"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBo67H6GlVFWdL_8SIN12WM3B_zCyPhSUc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1074524553129:android:db5461358a80bd2ad10eb8",
+        "android_client_info": {
+          "package_name": "com.example.tf_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBo67H6GlVFWdL_8SIN12WM3B_zCyPhSUc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
