@@ -12,7 +12,7 @@ class LoadingPage extends StatelessWidget {
     Timer(const Duration(seconds: 3), () {
       final FirebaseAuth auth = FirebaseAuth.instance;
       if (auth.currentUser != null) {
-        // User is already authenticated, navigate to homepage
+        // User is already aukathenticated, navigate to homepage
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const BottomNavigation()),

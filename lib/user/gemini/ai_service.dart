@@ -30,15 +30,16 @@ class AiService extends GetxController {
   }
 
   // Function to fetch and process the AI response
-  Future<void> response(
-      {required String label,
-      required String disease,
-      required String image}) async {
+  Future<void> response({
+    required String label,
+    required String disease,
+    required String image,
+  }) async {
     String autoID = generateUniqueId();
     log('click');
 
     // Your API Key (remember to protect this key in production)
-    const apiKey = 'AIzaSyCcKFJKzEPFpArq3fY8-bjn07Arpu9ntFg';
+    const apiKey = 'AIzaSyDDr5UCuvHkMpA6oX-0VAAAS6vSA8k-RK4';
 
     // Initialize the model using the API key
     final model = GenerativeModel(
@@ -72,10 +73,14 @@ class AiService extends GetxController {
     final response = await model.generateContent(content);
 
     try {
-      final parseTry =
-          g('${response.text}', '```json', '```'); // Extract the JSON part
-      final decodedResponse =
-          jsonDecode(parseTry); // Decoding the JSON response
+      final parseTry = g(
+        '${response.text}',
+        '```json',
+        '```',
+      ); // Extract the JSON part
+      final decodedResponse = jsonDecode(
+        parseTry,
+      ); // Decoding the JSON response
       responseFromAi.value =
           decodedResponse; // Storing the parsed map into the observable variable
       log('Parsed response: $decodedResponse'); // Log the parsed response
@@ -85,10 +90,9 @@ class AiService extends GetxController {
           .collection('plant')
           .doc(autoID)
           .set(decodedResponse, SetOptions(merge: true));
-      await _firestore
-          .collection('plant')
-          .doc(autoID)
-          .set({'image': image}, SetOptions(merge: true));
+      await _firestore.collection('plant').doc(autoID).set({
+        'image': image,
+      }, SetOptions(merge: true));
       log('Successfully added to Firestore');
     } catch (e) {
       log('Error decoding JSON: $e');
