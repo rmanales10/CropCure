@@ -45,41 +45,29 @@ class _HomePageState extends State<HomePage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildGreetingSection(),
-                _buildPageView(),
-                SizedBox(height: 10),
-                dottedslide(),
-                Expanded(child: Container()),
-              ],
-            ),
-            _buildDraggableScrollableSheet(),
-          ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.white, Colors.green.shade50],
+          ),
         ),
-      ),
-    );
-  }
-
-  Obx dottedslide() {
-    return Obx(
-      () => Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(
-          3,
-          (index) => Container(
-            width: 20,
-            height: 8,
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(
-              shape: BoxShape.rectangle,
-              color: _currentPage.value == index ? Colors.green : Colors.grey,
-              borderRadius: BorderRadius.circular(15),
-            ),
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildGreetingSection(),
+                  _buildPageView(),
+                  const SizedBox(height: 15),
+                  dottedslide(),
+                  Expanded(child: Container()),
+                ],
+              ),
+              _buildDraggableScrollableSheet(),
+            ],
           ),
         ),
       ),
@@ -87,35 +75,70 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildGreetingSection() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 50, left: 30, right: 30, bottom: 20),
+    return Container(
+      margin: const EdgeInsets.only(top: 20, left: 20, right: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
       child: Row(
         children: [
           Obx(() {
             _profileController.fetchUserInfo();
-            final data = _profileController.userInfo; // Use .value here
+            final data = _profileController.userInfo;
             try {
-              return ClipOval(
-                child: Image.memory(
-                  base64Decode(data['base64image']),
-                  height: 70,
-                  width: 70,
-                  gaplessPlayback: true,
-                  fit: BoxFit.cover,
+              return Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Image.memory(
+                    base64Decode(data['base64image']),
+                    height: 70,
+                    width: 70,
+                    gaplessPlayback: true,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               );
             } catch (e) {
-              return ClipOval(
-                child: Image.asset(
-                  'assets/images/2.jpg',
-                  height: 70,
-                  width: 70,
-                  gaplessPlayback: true,
-                  fit: BoxFit.cover,
+              return Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/2.jpg',
+                    height: 70,
+                    width: 70,
+                    gaplessPlayback: true,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               );
             }
-            // return _buildProfileImage(data);
           }),
           const SizedBox(width: 15),
           Expanded(
@@ -130,7 +153,7 @@ class _HomePageState extends State<HomePage>
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Colors.black87,
                         ),
                       ),
                     ),
@@ -141,9 +164,23 @@ class _HomePageState extends State<HomePage>
                   ],
                 ),
                 const SizedBox(height: 5),
-                const Text(
-                  "Welcome to CropCure.",
-                  style: TextStyle(fontSize: 16, color: Colors.black),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    "Welcome to CropCure",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.green,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -155,8 +192,8 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildPageView() {
     return Container(
-      margin: const EdgeInsets.only(top: 50),
-      height: 200,
+      margin: const EdgeInsets.only(top: 20),
+      height: 180,
       child: Stack(
         children: [
           PageView(
@@ -177,28 +214,42 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildPageViewItem(String title, String imagePath) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        image: DecorationImage(image: AssetImage(imagePath), fit: BoxFit.cover),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
-      child: Container(
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.asset(imagePath, fit: BoxFit.cover),
+      ),
+    );
+  }
+
+  Obx dottedslide() {
+    return Obx(
+      () => Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(
+          3,
+          (index) => AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: _currentPage.value == index ? 25 : 8,
+            height: 8,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(
+              color:
+                  _currentPage.value == index
+                      ? Colors.green
+                      : Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(15),
+            ),
           ),
         ),
       ),
@@ -214,13 +265,12 @@ class _HomePageState extends State<HomePage>
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(50)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
             boxShadow: [
               BoxShadow(
-                color: Colors.green,
-                spreadRadius: 5,
-                // blurRadius: 7,
-                // offset: const Offset(0, 3),
+                color: Colors.green.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, -5),
               ),
             ],
           ),
@@ -229,15 +279,59 @@ class _HomePageState extends State<HomePage>
               Container(
                 width: 50,
                 height: 5,
-                margin: const EdgeInsets.symmetric(vertical: 8),
+                margin: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.green,
+                  color: Colors.green.shade200,
                   borderRadius: BorderRadius.circular(2.5),
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Your Plants",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.local_florist,
+                            color: Colors.green,
+                            size: 18,
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            "View All",
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 15),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Obx(() {
                     _cropController.fetchPlantDetails();
                     return GridView.builder(
@@ -245,9 +339,9 @@ class _HomePageState extends State<HomePage>
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                            childAspectRatio: 0.9,
+                            crossAxisSpacing: 15,
+                            mainAxisSpacing: 15,
+                            childAspectRatio: 0.85,
                           ),
                       itemCount: _cropController.plantDetails.length,
                       itemBuilder: (context, index) {
@@ -274,44 +368,154 @@ class _HomePageState extends State<HomePage>
               imageBytes: base64Decode(plant['image']),
             ),
           ),
-      child: Card(
-        color: Colors.black,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        elevation: 5,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child:
-                      plant['image'] != null
-                          ? Image.memory(
-                            base64Decode(plant['image']),
-                            height: 100,
-                            fit: BoxFit.cover,
-                            gaplessPlayback: true,
-                          )
-                          : Image.asset(
-                            'assets/images/p3.png',
-                            height: 100,
-                            fit: BoxFit.cover,
-                          ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                plant['name'],
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ],
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.green.shade700, Colors.teal.shade600],
           ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.green.withOpacity(0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Decorative circles in background
+            Positioned(
+              right: -10,
+              top: -10,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.1),
+                ),
+              ),
+            ),
+            Positioned(
+              left: -5,
+              bottom: -5,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.1),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            plant['image'] != null
+                                ? Image.memory(
+                                  base64Decode(plant['image']),
+                                  fit: BoxFit.cover,
+                                  gaplessPlayback: true,
+                                )
+                                : Image.asset(
+                                  'assets/images/p3.png',
+                                  fit: BoxFit.cover,
+                                ),
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black.withOpacity(0.3),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    flex: 1,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withOpacity(0.2),
+                            Colors.white.withOpacity(0.1),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.local_florist,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              plant['name'],
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -34,145 +34,213 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 50),
-              // Back button
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.white, const Color(0xFFF5F5F5)],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: _auth.signOut,
-                    child: const Icon(Icons.logout, color: Colors.black),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Title
-              const Text(
-                "Profile Settings",
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                "Your Profile",
-                style: TextStyle(color: Colors.black, fontSize: 16),
-              ),
-              const SizedBox(height: 30),
-
-              // Profile Avatar with Edit Icon
-              Stack(
-                children: [
-                  Obx(() {
-                    _controller.fetchUserInfo();
-                    try {
-                      Uint8List? imageBytess = base64Decode(
-                        _controller.userInfo['base64image'],
-                      );
-                      return ClipOval(
-                        child: Image.memory(
-                          imageBytess,
-                          height: 100,
-                          width: 100,
-                          fit: BoxFit.cover,
-                          gaplessPlayback: true,
+                  const SizedBox(height: 20),
+                  // Header with Logout
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Profile",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 28,
                         ),
-                      );
-                    } catch (e) {
-                      return ClipOval(
-                        child: Image.asset(
-                          'assets/images/2.jpg',
-                          height: 100,
-                          width: 100,
-                          fit: BoxFit.cover,
-                        ),
-                      );
-                    }
-                  }),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: pickImageAndProcess,
-                      child: Container(
+                      ),
+                      Container(
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
                           color: Colors.white,
-                          border: Border.all(
-                            color: const Color.fromARGB(255, 15, 129, 19),
-                            width: 1,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          onPressed: _auth.signOut,
+                          icon: const Icon(
+                            Icons.logout_rounded,
+                            color: Colors.red,
                           ),
                         ),
-                        padding: const EdgeInsets.all(6),
-                        child: const Icon(
-                          Icons.edit,
-                          color: Color.fromARGB(255, 15, 129, 19),
-                          size: 16,
-                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+
+                  // Profile Card
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 20,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        // Profile Avatar with Edit Icon
+                        Stack(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 20,
+                                    spreadRadius: 5,
+                                  ),
+                                ],
+                              ),
+                              child: Obx(() {
+                                _controller.fetchUserInfo();
+                                try {
+                                  Uint8List? imageBytess = base64Decode(
+                                    _controller.userInfo['base64image'],
+                                  );
+                                  return ClipOval(
+                                    child: Image.memory(
+                                      imageBytess,
+                                      height: 120,
+                                      width: 120,
+                                      fit: BoxFit.cover,
+                                      gaplessPlayback: true,
+                                    ),
+                                  );
+                                } catch (e) {
+                                  return ClipOval(
+                                    child: Image.asset(
+                                      'assets/images/2.jpg',
+                                      height: 120,
+                                      width: 120,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  );
+                                }
+                              }),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: GestureDetector(
+                                onTap: pickImageAndProcess,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 10,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  padding: const EdgeInsets.all(8),
+                                  child: const Icon(
+                                    Icons.camera_alt_rounded,
+                                    color: Color(0xFF0F8113),
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Obx(
+                          () => buildInputField(
+                            'Full Name',
+                            _nameController,
+                            enable: isEdit.value,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        buildInputField('Email', _emailController),
+                        const SizedBox(height: 24),
+
+                        // Save Button
+                        GestureDetector(
+                          onTap: () async {
+                            isEdit.value = !isEdit.value;
+                            if (!isEdit.value) {
+                              await _controller.editName(_nameController.text);
+                            }
+                          },
+                          child: Obx(
+                            () => Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                gradient: LinearGradient(
+                                  colors:
+                                      isEdit.value
+                                          ? [
+                                            const Color(0xFF092E5E),
+                                            const Color(0xFF0A3B7A),
+                                          ]
+                                          : [
+                                            const Color(0xFF0F8113),
+                                            const Color(0xFF0B9D0F),
+                                          ],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (isEdit.value
+                                            ? const Color(0xFF092E5E)
+                                            : const Color(0xFF0F8113))
+                                        .withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  isEdit.value
+                                      ? 'Save Changes'
+                                      : "Edit Profile",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 30),
-              Obx(
-                () => buildInputField(
-                  'Full Name',
-                  _nameController,
-                  enable: isEdit.value,
-                ),
-              ),
-              const SizedBox(height: 16),
-              buildInputField('Email', _emailController),
-              const SizedBox(height: 16),
-
-              // Save Button
-              GestureDetector(
-                onTap: () async {
-                  isEdit.value = !isEdit.value;
-                  if (!isEdit.value) {
-                    await _controller.editName(_nameController.text);
-                  }
-                },
-                child: Obx(
-                  () => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 50),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(50),
-                        color:
-                            isEdit.value
-                                ? const Color.fromARGB(255, 9, 46, 94)
-                                : const Color.fromARGB(255, 15, 129, 19),
-                      ),
-                      child: Center(
-                        child: Text(
-                          isEdit.value ? 'Done' : "Edit",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -191,29 +259,30 @@ class _ProfilePageState extends State<ProfilePage> {
         Text(
           label,
           style: const TextStyle(
-            color: Color.fromARGB(255, 15, 129, 19),
-            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F8113),
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: const Color.fromARGB(255, 15, 129, 19),
-              width: 2,
+              color: const Color(0xFF0F8113).withOpacity(0.2),
+              width: 1.5,
             ),
           ),
           child: TextFormField(
             enabled: enable,
             controller: controller,
-            cursorColor: Colors.black,
-            style: const TextStyle(color: Colors.black),
-            decoration: const InputDecoration(
-              hintStyle: TextStyle(color: Colors.black),
+            cursorColor: const Color(0xFF0F8113),
+            style: const TextStyle(color: Colors.black87, fontSize: 15),
+            decoration: InputDecoration(
+              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
+              contentPadding: const EdgeInsets.symmetric(
                 vertical: 16,
                 horizontal: 16,
               ),

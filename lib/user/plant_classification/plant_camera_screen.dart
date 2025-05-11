@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:io';
 import 'dart:async';
 import 'package:camera/camera.dart';
@@ -36,6 +37,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
   bool _hasPlantDetected = false;
   String _currentPlantName = '';
   String _currentDiseaseName = '';
+  bool _hasDiseaseStored = false;
   String _base64Image = '';
   final _aiService = Get.put(AiService());
   RxBool isclicked = false.obs;
@@ -116,40 +118,6 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
   void _startRecognition() {
     if (_recognitionTimer != null) return;
 
-    // Start with an initial delay of 0
-    Future.delayed(Duration.zero, () async {
-      if (_controller == null ||
-          !_controller!.value.isInitialized ||
-          !_isRecognizing.value) {
-        return;
-      }
-
-      try {
-        final XFile file = await _controller!.takePicture();
-        final bytes = await file.readAsBytes();
-        final image = base64Encode(bytes);
-
-        // Try to recognize the plant
-        await _plantRecognizer.recognizePlant(image);
-
-        // Update local variables with recognition results
-        setState(() {
-          _hasPlantDetected = _plantRecognizer.hasPlantDetected.value;
-          _currentPlantName = _plantRecognizer.plantName.value;
-          _base64Image = image;
-        });
-
-        // If plant is detected, stop recognition and start disease detection
-        if (_hasPlantDetected) {
-          _isRecognizing.value = false;
-          _stopRecognition();
-          _startDiseaseDetection();
-        }
-      } catch (e) {
-        print('Error during recognition: $e');
-      }
-    });
-
     // Set up the periodic timer for every 2 seconds
     _recognitionTimer = Timer.periodic(const Duration(seconds: 2), (
       timer,
@@ -165,21 +133,25 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
         final bytes = await file.readAsBytes();
         final image = base64Encode(bytes);
 
-        // Try to recognize the plant
+        // Try to recognize the plant and wait for the response
         await _plantRecognizer.recognizePlant(image);
 
-        // Update local variables with recognition results
-        setState(() {
-          _hasPlantDetected = _plantRecognizer.hasPlantDetected.value;
-          _currentPlantName = _plantRecognizer.plantName.value;
-          _base64Image = image;
-        });
+        // Only update and display if we haven't detected a plant yet
+        if (!_hasPlantDetected) {
+          setState(() {
+            _hasPlantDetected = _plantRecognizer.hasPlantDetected.value;
+            _currentPlantName = _plantRecognizer.plantName.value;
+            _base64Image = image;
+          });
 
-        // If plant is detected, stop recognition and start disease detection
-        if (_hasPlantDetected) {
-          _isRecognizing.value = false;
-          _stopRecognition();
-          _startDiseaseDetection();
+          // If a plant is detected, stop immediately and start disease detection
+          if (_hasPlantDetected &&
+              _currentPlantName.toLowerCase() != "no plant detected") {
+            timer.cancel(); // Stop the timer immediately
+            _isRecognizing.value = false;
+            _stopRecognition();
+            _startDiseaseDetection();
+          }
         }
       } catch (e) {
         print('Error during recognition: $e');
@@ -194,7 +166,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
   }
 
   void _startDiseaseDetection() async {
-    if (_isDetectingDisease.value) return;
+    if (_isDetectingDisease.value || _hasDiseaseStored) return;
 
     _isDetectingDisease.value = true;
 
@@ -215,6 +187,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
           _currentDiseaseName = _plantRecognizer.diseaseName.value;
           _isDetectingDisease.value = false;
           _base64Image = image;
+          _hasDiseaseStored = true;
         });
       }
     } catch (e) {
@@ -239,6 +212,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
     _plantRecognizer.hasPlantDetected.value = false;
     _plantRecognizer.hasDiseaseDetected.value = false;
     _isDetectingDisease.value = false;
+    _hasDiseaseStored = false;
   }
 
   // Add a method to start new detection
@@ -248,6 +222,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
       _currentPlantName = '';
       _currentDiseaseName = '';
       _base64Image = '';
+      _hasDiseaseStored = false;
     });
     _isRecognizing.value = true;
   }
@@ -447,60 +422,85 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                       bottom: 30,
                       left: 40,
                       right: 40,
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          isclicked.value = true;
-                          try {
-                            await _aiService.response(
-                              label: _currentPlantName,
-                              disease: _currentDiseaseName,
-                              image: _base64Image,
-                            );
-
-                            // Show snackbar first
-                            Get.snackbar(
-                              'Success',
-                              'Treatment is being fetched',
-                            );
-
-                            // Wait a bit before navigating back
-                            await Future.delayed(
-                              const Duration(milliseconds: 500),
-                            );
-                            Get.off(() => BottomNavigation());
-                          } catch (e) {
-                            isclicked.value = false;
-                            Get.snackbar(
-                              'Error',
-                              'Failed to fetch treatment. Please try again.',
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.healing, color: Colors.white),
-                        label:
-                            isclicked.value == true
-                                ? CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
+                      child: GestureDetector(
+                        onTapDown: (_) => _animationController.forward(),
+                        onTapUp: (_) => _animationController.reverse(),
+                        onTapCancel: () => _animationController.reverse(),
+                        child: ScaleTransition(
+                          scale: _scaleAnimation,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.green[700]!,
+                                  Colors.greenAccent[400]!,
+                                ],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.greenAccent.withOpacity(0.3),
+                                  blurRadius: 12,
+                                  offset: Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(30),
+                                onTap: () {
+                                  _getPlantTreatment();
+                                  isclicked.value = true;
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 18,
                                   ),
-                                )
-                                : Text(
-                                  'Get Treatment',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.1,
+                                  child: Center(
+                                    child: Obx(
+                                      () =>
+                                          isclicked.value
+                                              ? SizedBox(
+                                                height: 28,
+                                                width: 28,
+                                                child: CircularProgressIndicator(
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.white),
+                                                  strokeWidth: 3,
+                                                ),
+                                              )
+                                              : Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.healing,
+                                                    color: Colors.white,
+                                                    size: 28,
+                                                  ),
+                                                  SizedBox(width: 12),
+                                                  Text(
+                                                    'Get Treatment',
+                                                    style: TextStyle(
+                                                      fontSize: 20,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      letterSpacing: 1.1,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                    ),
                                   ),
                                 ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
                           ),
-                          elevation: 6,
-                          shadowColor: Colors.greenAccent,
                         ),
                       ),
                     ),
@@ -512,6 +512,212 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                 ),
               ),
     );
+  }
+
+  Future<void> _getPlantTreatment() async {
+    await _plantRecognizer.getPlantTreatment(
+      _currentPlantName,
+      _currentDiseaseName,
+    );
+
+    if (mounted) {
+      isclicked.value = false;
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return Dialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(25),
+            ),
+            elevation: 8,
+            child: Container(
+              padding: const EdgeInsets.all(25),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header with icon and title
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.medical_services_outlined,
+                          color: Colors.green[700],
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Text(
+                          'Treatment Plan',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green[800],
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.grey[100],
+                          padding: const EdgeInsets.all(8),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Plant and Disease Info
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 15,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.local_florist,
+                              size: 18,
+                              color: Colors.green[700],
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _currentPlantName,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.green[800],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              _currentDiseaseName.toLowerCase() ==
+                                      'no disease detected'
+                                  ? Icons.check_circle
+                                  : Icons.warning,
+                              size: 18,
+                              color:
+                                  _currentDiseaseName.toLowerCase() ==
+                                          'no disease detected'
+                                      ? Colors.green[700]
+                                      : Colors.orange[700],
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _currentDiseaseName,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color:
+                                      _currentDiseaseName.toLowerCase() ==
+                                              'no disease detected'
+                                          ? Colors.green[800]
+                                          : Colors.orange[800],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Treatment Content
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: Colors.green[200]!),
+                    ),
+                    constraints: BoxConstraints(
+                      maxHeight: 200, // Adjust as needed for your dialog size
+                    ),
+                    child: SingleChildScrollView(
+                      child: Text(
+                        _plantRecognizer.treatmentRecommendation.value,
+                        style: TextStyle(
+                          fontSize: 15,
+                          height: 1.5,
+                          color: Colors.green[900],
+                        ),
+                        // Remove maxLines and overflow for full display
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 25),
+                  // Action Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            startNewDetection();
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Try Another'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[600],
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            
+                            Navigator.of(context).pop();
+                          },
+                          icon: const Icon(Icons.save),
+                          label: const Text('Save'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green[600],
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
   }
 }
 
