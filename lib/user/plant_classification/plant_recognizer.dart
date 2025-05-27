@@ -54,10 +54,10 @@ class PlantRecognizer extends GetxController {
     try {
       final content = [
         Content.text(
-          'What disease is affecting this plant? Respond with only the disease name, nothing else. If you cannot identify any disease or the plant appears healthy, respond with "No disease detected".',
+          'What disease is affecting this $plantName? Respond with only the disease name, nothing else. If you cannot identify any disease or the plant appears healthy, respond with "No disease detected".',
         ),
         Content.multi([
-          TextPart('What disease is affecting this plant?'),
+          TextPart('What disease is affecting this $plantName?'),
           DataPart('image/jpeg', base64Decode(base64Image)),
         ]),
       ];
@@ -89,7 +89,8 @@ class PlantRecognizer extends GetxController {
       final response = await textModel.generateContent([Content.text(prompt)]);
       final treatment = response.text?.trim() ?? '';
 
-      treatmentRecommendation.value = treatment;
+      // Remove asterisks from the treatment recommendation
+      treatmentRecommendation.value = treatment.replaceAll('*', '');
       hasTreatmentGenerated.value = true;
 
       log('Treatment recommendation: $treatmentRecommendation');

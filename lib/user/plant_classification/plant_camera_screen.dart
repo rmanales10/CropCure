@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:cropcure/user/gemini/ai_service.dart';
 import 'package:cropcure/user/home/bottom_navigation.dart';
+import 'package:cropcure/user/plant_classification/plant_controller.dart';
 import 'package:cropcure/user/plant_classification/plant_recognizer.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -41,6 +42,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
   String _base64Image = '';
   final _aiService = Get.put(AiService());
   RxBool isclicked = false.obs;
+  final _plantController = Get.put(PlantController());
 
   @override
   void initState() {
@@ -453,7 +455,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                                 borderRadius: BorderRadius.circular(30),
                                 onTap: () {
                                   _getPlantTreatment();
-                                  isclicked.value = true;
+                                  isclicked.value = !isclicked.value;
                                 },
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
@@ -519,9 +521,15 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
       _currentPlantName,
       _currentDiseaseName,
     );
+    await _plantController.addPlant(
+      _currentPlantName,
+      _currentDiseaseName,
+      _plantRecognizer.treatmentRecommendation.value,
+      _base64Image,
+    );
 
     if (mounted) {
-      isclicked.value = false;
+      isclicked.value = !isclicked.value;
       showDialog(
         context: context,
         builder: (BuildContext context) {
@@ -694,11 +702,10 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            
                             Navigator.of(context).pop();
                           },
-                          icon: const Icon(Icons.save),
-                          label: const Text('Save'),
+                          icon: const Icon(Icons.done),
+                          label: const Text('Done'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green[600],
                             foregroundColor: Colors.white,
