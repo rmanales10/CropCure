@@ -23,12 +23,18 @@ class _ProfilePageState extends State<ProfilePage> {
   final _auth = Get.put(AuthService());
   final isEdit = false.obs;
   String? base64Image;
-  Uint8List? _imageBytes;
 
   @override
   void initState() {
     super.initState();
     initProfile();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    super.dispose();
   }
 
   @override
@@ -117,20 +123,34 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ],
                               ),
                               child: Obx(() {
-                                _controller.fetchUserInfo();
                                 try {
-                                  Uint8List? imageBytess = base64Decode(
-                                    _controller.userInfo['base64image'],
-                                  );
-                                  return ClipOval(
-                                    child: Image.memory(
-                                      imageBytess,
-                                      height: 120,
-                                      width: 120,
-                                      fit: BoxFit.cover,
-                                      gaplessPlayback: true,
-                                    ),
-                                  );
+                                  if (_controller.userInfo['base64image'] !=
+                                          null &&
+                                      _controller
+                                          .userInfo['base64image']
+                                          .isNotEmpty) {
+                                    Uint8List? imageBytess = base64Decode(
+                                      _controller.userInfo['base64image'],
+                                    );
+                                    return ClipOval(
+                                      child: Image.memory(
+                                        imageBytess,
+                                        height: 120,
+                                        width: 120,
+                                        fit: BoxFit.cover,
+                                        gaplessPlayback: true,
+                                      ),
+                                    );
+                                  } else {
+                                    return ClipOval(
+                                      child: Image.asset(
+                                        'assets/images/2.jpg',
+                                        height: 120,
+                                        width: 120,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    );
+                                  }
                                 } catch (e) {
                                   return ClipOval(
                                     child: Image.asset(
@@ -295,10 +315,12 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> initProfile() async {
     await _controller.fetchUserInfo();
-    setState(() {
-      _nameController.text = _controller.userInfo['fullname'];
-      _emailController.text = _controller.userInfo['email'];
-    });
+    if (mounted) {
+      setState(() {
+        _nameController.text = _controller.userInfo['fullname'];
+        _emailController.text = _controller.userInfo['email'];
+      });
+    }
   }
 
   Future<void> pickImageAndProcess() async {
@@ -316,12 +338,13 @@ class _ProfilePageState extends State<ProfilePage> {
           // Web: Use 'readAsBytes' to process the picked image
           final Uint8List webImageBytes = await pickedFile.readAsBytes();
 
-          setState(() {
-            _imageBytes = webImageBytes;
-            base64Image = base64Encode(
-              webImageBytes,
-            ); // Store base64 image if needed
-          });
+          if (mounted) {
+            setState(() {
+              base64Image = base64Encode(
+                webImageBytes,
+              ); // Store base64 image if needed
+            });
+          }
 
           log("Image selected on Web: ${webImageBytes.lengthInBytes} bytes");
         } else {
@@ -333,10 +356,11 @@ class _ProfilePageState extends State<ProfilePage> {
             final Uint8List nativeImageBytes =
                 await nativeImageFile.readAsBytes();
 
-            setState(() {
-              _imageBytes = nativeImageBytes;
-              base64Image = base64Encode(nativeImageBytes);
-            });
+            if (mounted) {
+              setState(() {
+                base64Image = base64Encode(nativeImageBytes);
+              });
+            }
             await _controller.storeImage(base64Image!);
             log("Image selected on Native: ${nativeImageFile.path}");
           } else {

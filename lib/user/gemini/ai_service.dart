@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:cropcure/config/gemini_config.dart';
 import 'dart:math' as rnd;
 
 class AiService extends GetxController {
@@ -39,11 +40,11 @@ class AiService extends GetxController {
     log('click');
 
     // Your API Key (remember to protect this key in production)
-    const apiKey = 'AIzaSyDDr5UCuvHkMpA6oX-0VAAAS6vSA8k-RK4';
+    const apiKey = GeminiConfig.apiKey;
 
-    // Initialize the model using the API key
+    // Initialize the model using Gemini 2.5 Flash for better performance
     final model = GenerativeModel(
-      model: 'gemini-1.5-flash-latest',
+      model: GeminiConfig.generalModel,
       apiKey: apiKey,
     );
 

@@ -61,7 +61,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCjzgpw7k9q4gdG7hb8PJr0ENlGq_MXQOw',
-    appId: '1:383934768885:android:c8c768ca5e087ddd93c7bc',
+    appId: '1:383934768885:android:181fa51b64c31cf093c7bc',
     messagingSenderId: '383934768885',
     projectId: 'cropcure-d93eb',
     storageBucket: 'cropcure-d93eb.firebasestorage.app',

@@ -14,7 +14,53 @@ class AuthService extends GetxController {
   // Get current user
   User? get user => _auth.currentUser;
 
-  // Register method
+  // Register method with SMS verification
+  Future<String> registerUserWithSMS(
+    String email,
+    String fullname,
+    String password,
+    String phoneNumber,
+  ) async {
+    try {
+      // Register the user
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
+
+      // Fetch IP Address using a public API
+      String ipAddress = await _getIpAddress();
+
+      // Get the current timestamp (signup time)
+      DateTime signupDate = DateTime.now();
+
+      // Log the user details in Firestore under 'users' collection
+      await _firestore.collection('users').doc(userCredential.user!.uid).set({
+        'email': email,
+        'password': password,
+        'fullname': fullname,
+        'phone_number': phoneNumber,
+        'phone_verified': true, // SMS verification completed
+        'created_at': signupDate,
+        'ip_address': ipAddress,
+        'status': 'online', // User is online at the time of registration
+      });
+
+      // Log the registration activity
+      await _logActivity(
+        userCredential.user!.uid,
+        'User registered with SMS verification',
+        email,
+        ipAddress,
+        signupDate,
+        'online',
+      );
+
+      return 'Registration successful! Your account has been created.';
+    } on FirebaseAuthException catch (e) {
+      return e.message ?? 'An error occurred during registration.';
+    }
+  }
+
+  // Original register method (for backward compatibility)
   Future<String> registerUser(
     String email,
     String fullname,
@@ -22,11 +68,8 @@ class AuthService extends GetxController {
   ) async {
     try {
       // Register the user
-      UserCredential userCredential =
-          await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
 
       // Fetch IP Address using a public API
       String ipAddress = await _getIpAddress();
@@ -45,31 +88,34 @@ class AuthService extends GetxController {
       });
 
       // Log the registration activity
-      await _logActivity(userCredential.user!.uid, 'User registered', email,
-          ipAddress, signupDate, 'online');
+      await _logActivity(
+        userCredential.user!.uid,
+        'User registered',
+        email,
+        ipAddress,
+        signupDate,
+        'online',
+      );
 
-      await sendEmailVerification();
-      return 'Registration successful! Please check your email for verification.';
+      return 'Registration successful! Your account has been created.';
     } on FirebaseAuthException catch (e) {
       return e.message ?? 'An error occurred during registration.';
     }
   }
 
-  // Send email verification
-  Future<void> sendEmailVerification() async {
+  // Check if the user is verified (SMS verification is used)
+  bool isUserVerified() {
     User? user = _auth.currentUser;
-    if (user != null && !user.emailVerified) {
-      await user.sendEmailVerification();
-      await _logActivity(user.uid, 'Email verification sent', user.email ?? '',
-          '', DateTime.now(), 'online');
-    }
+    return user != null; // SMS verification is handled during registration
   }
 
   // Sign-in method with email and password
   Future<String> signInWithEmailPassword(String email, String password) async {
     try {
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-          email: email, password: password);
+        email: email,
+        password: password,
+      );
       User? user = userCredential.user;
 
       if (user != null) {
@@ -79,14 +125,17 @@ class AuthService extends GetxController {
         // Get current timestamp
         DateTime currentTime = DateTime.now();
 
-        // Check if the email is verified
-        if (!user.emailVerified) {
-          return 'Please verify your email before logging in.';
-        }
+        // SMS verification is used instead of email verification
 
         // Log the user activity (sign-in)
-        await _logActivity(user.uid, 'User signed in', email, ipAddress,
-            currentTime, 'online');
+        await _logActivity(
+          user.uid,
+          'User signed in',
+          email,
+          ipAddress,
+          currentTime,
+          'online',
+        );
 
         // Update the user's status in Firestore
         await _firestore.collection('users').doc(user.uid).set({
@@ -102,15 +151,15 @@ class AuthService extends GetxController {
     }
   }
 
-  // Check if the user is verified
-  bool isEmailVerified() {
-    User? user = _auth.currentUser;
-    return user != null && user.emailVerified;
-  }
-
   // Log user activity (including IP address, date, time, and status)
-  Future<void> _logActivity(String userId, String action, String email,
-      String ipAddress, DateTime timestamp, String status) async {
+  Future<void> _logActivity(
+    String userId,
+    String action,
+    String email,
+    String ipAddress,
+    DateTime timestamp,
+    String status,
+  ) async {
     try {
       await _firestore.collection('activity_logs').doc(user!.uid).set({
         'user_id': userId,
@@ -129,8 +178,9 @@ class AuthService extends GetxController {
   Future<String> _getIpAddress() async {
     try {
       // Make a request to an external service that provides IP address
-      final response =
-          await http.get(Uri.parse('https://api.ipify.org?format=json'));
+      final response = await http.get(
+        Uri.parse('https://api.ipify.org?format=json'),
+      );
       if (response.statusCode == 200) {
         var data = json.decode(response.body);
         return data['ip']; // Return the IP address
@@ -148,8 +198,14 @@ class AuthService extends GetxController {
     User? user = _auth.currentUser;
     if (user != null) {
       // Log the sign-out activity
-      await _logActivity(user.uid, 'User signed out', user.email ?? '', '',
-          DateTime.now(), 'offline');
+      await _logActivity(
+        user.uid,
+        'User signed out',
+        user.email ?? '',
+        '',
+        DateTime.now(),
+        'offline',
+      );
 
       // Update the user status to offline in Firestore
       await _firestore.collection('users').doc(user.uid).set({

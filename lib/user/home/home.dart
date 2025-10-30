@@ -27,6 +27,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> fetchData() async {
     await _homeController.fetchPlants();
+    await _profileController
+        .fetchUserInfo(); // Fetch user info once during init
   }
 
   @override
@@ -78,53 +80,57 @@ class _HomePageState extends State<HomePage> {
       child: Row(
         children: [
           Obx(() {
-            _profileController.fetchUserInfo();
             final data = _profileController.userInfo;
             try {
-              return Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.green.withOpacity(0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: ClipOval(
-                  child: Image.memory(
-                    base64Decode(data['base64image']),
-                    height: 70,
-                    width: 70,
-                    gaplessPlayback: true,
-                    fit: BoxFit.cover,
+              if (data['base64image'] != null &&
+                  data['base64image'].isNotEmpty) {
+                return Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                ),
-              );
+                  child: ClipOval(
+                    child: Image.memory(
+                      base64Decode(data['base64image']),
+                      height: 70,
+                      width: 70,
+                      gaplessPlayback: true,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                );
+              }
             } catch (e) {
-              return Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.green.withOpacity(0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: ClipOval(
-                  child: Image.asset(
-                    'assets/images/2.jpg',
-                    height: 70,
-                    width: 70,
-                    gaplessPlayback: true,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              );
+              // Handle error or missing image
             }
+            // Return default avatar
+            return Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/2.jpg',
+                  height: 70,
+                  width: 70,
+                  gaplessPlayback: true,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            );
           }),
           const SizedBox(width: 15),
           Expanded(

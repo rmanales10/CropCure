@@ -3,6 +3,7 @@ import 'package:cropcure/admin/login.dart';
 import 'package:cropcure/user/home/home.dart';
 import 'package:cropcure/user/onboarding_login/auth_screen/signin.dart';
 import 'package:cropcure/user/onboarding_login/auth_screen/signup.dart';
+import 'package:cropcure/user/onboarding_login/auth_screen/otp_verification.dart';
 import 'package:cropcure/user/onboarding_login/forgot_password_page.dart';
 import 'package:cropcure/user/onboarding_login/page1.dart';
 import 'package:cropcure/user/onboarding_login/page2.dart';
@@ -16,7 +17,6 @@ import 'firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
- 
 
   runApp(kIsWeb ? ActivityLogApp() : const MyApp());
 }
@@ -37,6 +37,13 @@ class MyApp extends StatelessWidget {
         '/welcome': (context) => const WelcomePage(),
         '/signin': (context) => const LoginPage(),
         '/signup': (context) => const CreateAccountPage(),
+        '/otp-verification':
+            (context) => const OTPVerificationPage(
+              phoneNumber: '',
+              email: '',
+              fullName: '',
+              password: '',
+            ),
         '/forgot': (context) => const ForgotPasswordPage(),
         '/profile': (context) => const ProfilePage(),
         // '/disease': (context) => const PlantDiseasePage(),
@@ -53,7 +60,6 @@ class ActivityLogApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetMaterialApp(
       title: 'Crop Cure',
-      theme: ThemeData.dark(),
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
       routes: {

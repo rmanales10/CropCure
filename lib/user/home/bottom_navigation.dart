@@ -16,7 +16,6 @@ class _BottomNavigationState extends State<BottomNavigation>
   final plantName = TextEditingController();
   int _currentIndex = 0;
   late AnimationController _animationController;
-  List<Widget> body = [HomePage(), ProfilePage()];
 
   @override
   void initState() {
@@ -27,10 +26,22 @@ class _BottomNavigationState extends State<BottomNavigation>
     );
   }
 
+  // Build the current page based on index
+  Widget _getCurrentPage() {
+    switch (_currentIndex) {
+      case 0:
+        return const HomePage();
+      case 1:
+        return const ProfilePage();
+      default:
+        return const HomePage();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: body[_currentIndex],
+      body: _getCurrentPage(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: Container(
         height: 70,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'auth_service.dart'; // Import the AuthService
+import 'otp_verification.dart'; // Import OTP verification page
+import 'package:cropcure/services/sms_service.dart'; // Import SMS service
 
 class CreateAccountPage extends StatefulWidget {
   const CreateAccountPage({super.key});
@@ -13,12 +14,12 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isAgreed = false;
-  final AuthService _authService = Get.put(AuthService());
 
   // Controllers for text inputs
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _fullname = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
@@ -90,6 +91,13 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
               controller: _emailController,
             ),
             const SizedBox(height: 10),
+            _buildTextField(
+              "Phone Number",
+              hintText: "09XXXXXXXXX",
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 10),
             _buildPasswordField(
               "Password",
               isPasswordVisible: _isPasswordVisible,
@@ -116,6 +124,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     String label, {
     required String hintText,
     TextEditingController? controller,
+    TextInputType? keyboardType,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -131,6 +140,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
         const SizedBox(height: 5),
         TextFormField(
           controller: controller,
+          keyboardType: keyboardType,
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: const TextStyle(color: Colors.black),
@@ -263,22 +273,32 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
       onTap: () async {
         if (_isAgreed) {
           if (_confirmPasswordController.text == _passwordController.text) {
-            String result = await _authService.registerUser(
-              _emailController.text,
-              _fullname.text,
-              _confirmPasswordController.text,
-            );
-
-            if (result.contains('successful')) {
-              Get.snackbar('Success', 'Verification email sent!');
-              Navigator.pushNamed(context, '/signin');
-            } else {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text(result)));
+            // Validate phone number
+            if (!SMSService.isValidPhoneNumber(_phoneController.text)) {
+              Get.snackbar(
+                'Error',
+                'Please enter a valid Philippine phone number (e.g., 09XXXXXXXXX)',
+                backgroundColor: Colors.red,
+                colorText: Colors.white,
+              );
+              return;
             }
+
+            // Navigate to OTP verification
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) => OTPVerificationPage(
+                      phoneNumber: _phoneController.text,
+                      email: _emailController.text,
+                      fullName: _fullname.text,
+                      password: _confirmPasswordController.text,
+                    ),
+              ),
+            );
           } else {
-            Get.snackbar('Error', 'Contfirm password must be the same');
+            Get.snackbar('Error', 'Confirm password must be the same');
           }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -327,10 +347,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
               "You can object to the processing of your personal data if it is based on consent or legitimate business interest.\n\n"
               "4. The Right to Erasure or Blocking\n"
               "You have the right to withdraw or request the removal of your personal data when your rights are violated.\n\n"
-              "5. The Right to Damages\n"
-              "You can claim compensation for damages caused by unlawfully obtained or unauthorized use of your personal data.\n\n"
-              "The Data Privacy Act ensures compliance with international data protection standards."
-              "\n\nFor more details, please read our full privacy policy.",
+              "The Data Privacy Act ensures compliance with international data protection standards.",
             ),
             actions: [
               TextButton(

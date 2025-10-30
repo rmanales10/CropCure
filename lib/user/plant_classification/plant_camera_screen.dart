@@ -1,15 +1,12 @@
 import 'dart:convert';
 import 'dart:developer';
-import 'dart:io';
 import 'dart:async';
 import 'package:camera/camera.dart';
-import 'package:cropcure/user/gemini/ai_service.dart';
 import 'package:cropcure/user/home/bottom_navigation.dart';
 import 'package:cropcure/user/plant_classification/plant_controller.dart';
 import 'package:cropcure/user/plant_classification/plant_recognizer.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:path_provider/path_provider.dart';
 
 // Add the following dependencies to your pubspec.yaml:
 // camera: ^0.10.0+4
@@ -37,10 +34,9 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
   final RxBool _isDetectingDisease = false.obs;
   bool _hasPlantDetected = false;
   String _currentPlantName = '';
-  String _currentDiseaseName = '';
+  final RxString _currentDiseaseName = ''.obs; // Made reactive
   bool _hasDiseaseStored = false;
   String _base64Image = '';
-  final _aiService = Get.put(AiService());
   RxBool isclicked = false.obs;
   final _plantController = Get.put(PlantController());
 
@@ -120,43 +116,62 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
   void _startRecognition() {
     if (_recognitionTimer != null) return;
 
-    // Set up the periodic timer for every 2 seconds
-    _recognitionTimer = Timer.periodic(const Duration(seconds: 2), (
+    log('Starting plant recognition...');
+
+    // Set up the periodic timer for every 3 seconds (increased from 2 for better processing)
+    _recognitionTimer = Timer.periodic(const Duration(seconds: 3), (
       timer,
     ) async {
       if (_controller == null ||
           !_controller!.value.isInitialized ||
-          !_isRecognizing.value) {
+          !_isRecognizing.value ||
+          _hasPlantDetected) {
         return;
       }
 
       try {
+        log('Taking picture for plant recognition...');
         final XFile file = await _controller!.takePicture();
         final bytes = await file.readAsBytes();
         final image = base64Encode(bytes);
 
+        log('Recognizing plant from image...');
         // Try to recognize the plant and wait for the response
         await _plantRecognizer.recognizePlant(image);
 
         // Only update and display if we haven't detected a plant yet
-        if (!_hasPlantDetected) {
+        if (!_hasPlantDetected && mounted) {
+          final hasPlant = _plantRecognizer.hasPlantDetected.value;
+          final plantName = _plantRecognizer.plantName.value;
+
+          log(
+            'Recognition result - Plant detected: $hasPlant, Name: $plantName',
+          );
+
           setState(() {
-            _hasPlantDetected = _plantRecognizer.hasPlantDetected.value;
-            _currentPlantName = _plantRecognizer.plantName.value;
+            _hasPlantDetected = hasPlant;
+            _currentPlantName = plantName;
             _base64Image = image;
           });
 
           // If a plant is detected, stop immediately and start disease detection
           if (_hasPlantDetected &&
-              _currentPlantName.toLowerCase() != "no plant detected") {
+              _currentPlantName.isNotEmpty &&
+              _currentPlantName.toLowerCase() != "no plant detected" &&
+              _currentPlantName.toLowerCase() != "unknown plant") {
+            log(
+              'Plant detected: $_currentPlantName. Starting disease detection...',
+            );
             timer.cancel(); // Stop the timer immediately
             _isRecognizing.value = false;
             _stopRecognition();
+            await Future.delayed(const Duration(milliseconds: 500));
             _startDiseaseDetection();
           }
         }
       } catch (e) {
-        print('Error during recognition: $e');
+        log('Error during recognition: $e');
+        // Error logged, no need to show snackbar during continuous recognition
       }
     });
   }
@@ -168,8 +183,12 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
   }
 
   void _startDiseaseDetection() async {
-    if (_isDetectingDisease.value || _hasDiseaseStored) return;
+    if (_isDetectingDisease.value || _hasDiseaseStored) {
+      log('Disease detection already in progress or completed');
+      return;
+    }
 
+    log('Starting disease detection for plant: $_currentPlantName');
     _isDetectingDisease.value = true;
 
     try {
@@ -177,31 +196,43 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
         // Wait for 2 seconds before taking the picture for disease detection
         await Future.delayed(const Duration(seconds: 2));
 
+        log('Taking picture for disease detection...');
         final XFile file = await _controller!.takePicture();
         final bytes = await file.readAsBytes();
         final image = base64Encode(bytes);
 
+        log('Classifying plant disease...');
         // Call disease classification
         await _plantRecognizer.classifyPlantDisease(image);
 
+        final diseaseName = _plantRecognizer.diseaseName.value;
+        final diseaseDetected = _plantRecognizer.hasDiseaseDetected.value;
+
+        log(
+          'Disease detection result - Detected: $diseaseDetected, Name: $diseaseName',
+        );
+
         // Update local disease variable and store the final image
-        setState(() {
-          _currentDiseaseName = _plantRecognizer.diseaseName.value;
-          _isDetectingDisease.value = false;
-          _base64Image = image;
-          _hasDiseaseStored = true;
-        });
+        if (mounted) {
+          setState(() {
+            _currentDiseaseName.value = diseaseName;
+            _isDetectingDisease.value = false;
+            _base64Image = image;
+            _hasDiseaseStored = true;
+          });
+        }
       }
     } catch (e) {
-      print('Error during disease detection: $e');
+      log('Error during disease detection: $e');
       if (mounted) {
         setState(() {
           _isDetectingDisease.value = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to detect disease. Please try again.'),
+          SnackBar(
+            content: Text('Failed to detect disease: ${e.toString()}'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -222,7 +253,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
     setState(() {
       _hasPlantDetected = false;
       _currentPlantName = '';
-      _currentDiseaseName = '';
+      _currentDiseaseName.value = '';
       _base64Image = '';
       _hasDiseaseStored = false;
     });
@@ -327,99 +358,116 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                               ),
                             ],
                           ),
-                          if (_isDetectingDisease.value) ...[
-                            const SizedBox(height: 10),
-                            const Row(
-                              children: [
-                                SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.green,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Analyzing for diseases...',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ] else if (_currentDiseaseName.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color:
-                                    _currentDiseaseName.toLowerCase() ==
-                                            'no disease detected'
-                                        ? Colors.green.withOpacity(0.2)
-                                        : Colors.orange.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
+                          Obx(() {
+                            if (_isDetectingDisease.value) {
+                              return Column(
                                 children: [
-                                  Icon(
-                                    _currentDiseaseName.toLowerCase() ==
-                                            'no disease detected'
-                                        ? Icons.check_circle
-                                        : Icons.warning,
-                                    color:
-                                        _currentDiseaseName.toLowerCase() ==
-                                                'no disease detected'
-                                            ? Colors.green
-                                            : Colors.orange,
-                                    size: 24,
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.green,
+                                              ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Analyzing for diseases...',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _currentDiseaseName.toLowerCase() ==
+                                ],
+                              );
+                            } else if (_currentDiseaseName.value.isNotEmpty) {
+                              return Column(
+                                children: [
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          _currentDiseaseName.value
+                                                      .toLowerCase() ==
                                                   'no disease detected'
-                                              ? 'Plant is Healthy'
-                                              : 'Disease Detected',
-                                          style: TextStyle(
-                                            color:
-                                                _currentDiseaseName
+                                              ? Colors.green.withOpacity(0.2)
+                                              : Colors.orange.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          _currentDiseaseName.value
+                                                      .toLowerCase() ==
+                                                  'no disease detected'
+                                              ? Icons.check_circle
+                                              : Icons.warning,
+                                          color:
+                                              _currentDiseaseName.value
+                                                          .toLowerCase() ==
+                                                      'no disease detected'
+                                                  ? Colors.green
+                                                  : Colors.orange,
+                                          size: 24,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                _currentDiseaseName.value
                                                             .toLowerCase() ==
                                                         'no disease detected'
-                                                    ? Colors.green
-                                                    : Colors.orange,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
+                                                    ? 'Plant is Healthy'
+                                                    : 'Disease Detected',
+                                                style: TextStyle(
+                                                  color:
+                                                      _currentDiseaseName.value
+                                                                  .toLowerCase() ==
+                                                              'no disease detected'
+                                                          ? Colors.green
+                                                          : Colors.orange,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              if (_currentDiseaseName.value
+                                                      .toLowerCase() !=
+                                                  'no disease detected')
+                                                Text(
+                                                  _currentDiseaseName.value,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                         ),
-                                        if (_currentDiseaseName.toLowerCase() !=
-                                            'no disease detected')
-                                          Text(
-                                            _currentDiseaseName,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 14,
-                                            ),
-                                          ),
                                       ],
                                     ),
                                   ),
                                 ],
-                              ),
-                            ),
-                          ],
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          }),
                         ],
                       ),
                     ),
                   ),
-                  if (_hasPlantDetected && _currentDiseaseName.isNotEmpty)
+                  if (_hasPlantDetected && _currentDiseaseName.value.isNotEmpty)
                     Positioned(
                       bottom: 30,
                       left: 40,
@@ -519,11 +567,11 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
   Future<void> _getPlantTreatment() async {
     await _plantRecognizer.getPlantTreatment(
       _currentPlantName,
-      _currentDiseaseName,
+      _currentDiseaseName.value,
     );
     await _plantController.addPlant(
       _currentPlantName,
-      _currentDiseaseName,
+      _currentDiseaseName.value,
       _plantRecognizer.treatmentRecommendation.value,
       _base64Image,
     );
@@ -620,13 +668,13 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                         Row(
                           children: [
                             Icon(
-                              _currentDiseaseName.toLowerCase() ==
+                              _currentDiseaseName.value.toLowerCase() ==
                                       'no disease detected'
                                   ? Icons.check_circle
                                   : Icons.warning,
                               size: 18,
                               color:
-                                  _currentDiseaseName.toLowerCase() ==
+                                  _currentDiseaseName.value.toLowerCase() ==
                                           'no disease detected'
                                       ? Colors.green[700]
                                       : Colors.orange[700],
@@ -634,12 +682,12 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                _currentDiseaseName,
+                                _currentDiseaseName.value,
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w500,
                                   color:
-                                      _currentDiseaseName.toLowerCase() ==
+                                      _currentDiseaseName.value.toLowerCase() ==
                                               'no disease detected'
                                           ? Colors.green[800]
                                           : Colors.orange[800],
@@ -702,7 +750,10 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
+                            // Close dialog first
                             Navigator.of(context).pop();
+                            // Navigate to home with bottom navigation
+                            Get.offAll(() => const BottomNavigation());
                           },
                           icon: const Icon(Icons.done),
                           label: const Text('Done'),
