@@ -1,15 +1,14 @@
-import 'package:cropcure/admin/activitylog.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-class MyLogin extends StatefulWidget {
-  const MyLogin({super.key});
+class AdminLogin extends StatefulWidget {
+  const AdminLogin({super.key});
 
   @override
-  State<MyLogin> createState() => _MyLoginState();
+  State<AdminLogin> createState() => _AdminLoginState();
 }
 
-class _MyLoginState extends State<MyLogin> {
+class _AdminLoginState extends State<AdminLogin> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
@@ -30,7 +29,7 @@ class _MyLoginState extends State<MyLogin> {
 
     if (_emailController.text == 'admin' &&
         _passwordController.text == 'admin') {
-      Get.offAll(() => const ActivityLogScreen());
+      Get.offAllNamed('/dashboard');
       Get.snackbar(
         'Success',
         'Welcome back, Admin!',

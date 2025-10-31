@@ -1,5 +1,5 @@
-import 'package:cropcure/admin/activitylog.dart';
-import 'package:cropcure/admin/login.dart';
+import 'package:cropcure/admin/admin_dashboard_screen.dart';
+import 'package:cropcure/admin/admin_login.dart';
 import 'package:cropcure/user/home/home.dart';
 import 'package:cropcure/user/onboarding_login/auth_screen/signin.dart';
 import 'package:cropcure/user/onboarding_login/auth_screen/signup.dart';
@@ -18,7 +18,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  runApp(kIsWeb ? ActivityLogApp() : const MyApp());
+  runApp(kIsWeb ? AdminDashboardApp() : const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -53,19 +53,19 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class ActivityLogApp extends StatelessWidget {
-  const ActivityLogApp({super.key});
+class AdminDashboardApp extends StatelessWidget {
+  const AdminDashboardApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'Crop Cure',
+      title: 'CropCure Admin Dashboard',
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
-      routes: {
-        '/': (context) => const MyLogin(),
-        '/activity': (context) => ActivityLogScreen(),
-      },
+      getPages: [
+        GetPage(name: '/', page: () => const AdminLogin()),
+        GetPage(name: '/dashboard', page: () => const AdminDashboardScreen()),
+      ],
     );
   }
 }

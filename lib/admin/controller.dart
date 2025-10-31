@@ -4,7 +4,14 @@ import 'package:intl/intl.dart';
 
 class Controller extends GetxController {
   final history = RxList<Map<String, dynamic>>([]);
+  final users = RxList<Map<String, dynamic>>([]);
+  final selectedUserHistory = RxList<Map<String, dynamic>>([]);
   var isLoading = false.obs;
+  var isLoadingUsers = false.obs;
+  var selectedUserId = RxString('');
+
+  // Cache for user disease distributions
+  final Map<String, Map<String, int>> _userDiseaseCache = {};
 
   Future<void> fetchPlants() async {
     try {
@@ -15,20 +22,20 @@ class Controller extends GetxController {
               .orderBy('timestamp', descending: true)
               .get();
 
-      final List<Map<String, dynamic>> plantData =
-          querySnapshot.docs.map((doc) {
-            final data = doc.data();
-            print(
-              'Disease value from Firebase: ${data['disease']}',
-            ); // Debug print
-            // Ensure timestamp is properly handled
-            if (data['timestamp'] is Timestamp) {
-              data['timestamp'] = data['timestamp'];
-            }
-            return data;
-          }).toList();
+      final List<Map<String, dynamic>> plantData = [];
+
+      for (var doc in querySnapshot.docs) {
+        final data = Map<String, dynamic>.from(doc.data());
+        print('Disease value from Firebase: ${data['disease']}'); // Debug print
+        // Ensure timestamp is properly handled
+        if (data['timestamp'] is Timestamp) {
+          data['timestamp'] = data['timestamp'];
+        }
+        plantData.add(data);
+      }
 
       history.assignAll(plantData);
+      _clearDiseaseCache(); // Clear cache when history updates
     } catch (e) {
       print('Error fetching plants: $e');
       Get.snackbar('Error', 'Failed to load plant history');
@@ -174,5 +181,137 @@ class Controller extends GetxController {
             : (currentWeek > 0 ? 100.0 : 0.0);
 
     return {'current': currentWeek, 'previous': previousWeek, 'change': change};
+  }
+
+  // Fetch all users with their scan statistics
+  Future<void> fetchUsers() async {
+    try {
+      isLoadingUsers.value = true;
+
+      // Fetch all users
+      final usersSnapshot =
+          await FirebaseFirestore.instance.collection('users').get();
+
+      final List<Map<String, dynamic>> usersList = [];
+
+      for (var userDoc in usersSnapshot.docs) {
+        final userData = Map<String, dynamic>.from(userDoc.data());
+        final userId = userDoc.id;
+
+        // Count scans for this user
+        final userScans =
+            history.where((plant) {
+              // Check if plant has userId field or user_id field
+              final plantUserId = plant['userId'] ?? plant['user_id'];
+              return plantUserId?.toString() == userId;
+            }).toList();
+
+        usersList.add({
+          'uid': userId,
+          'email': userData['email'] ?? 'N/A',
+          'fullname': userData['fullname'] ?? 'Unknown User',
+          'phone_number': userData['phone_number'] ?? 'N/A',
+          'created_at': userData['created_at'],
+          'status': userData['status'] ?? 'offline',
+          'totalScans': userScans.length,
+          'diseaseDetected':
+              userScans
+                  .where(
+                    (p) =>
+                        p['disease']?.toString().trim().toLowerCase() !=
+                        'no disease detected',
+                  )
+                  .length,
+          'healthyScans':
+              userScans
+                  .where(
+                    (p) =>
+                        p['disease']?.toString().trim().toLowerCase() ==
+                        'no disease detected',
+                  )
+                  .length,
+        });
+      }
+
+      // Sort by total scans (descending)
+      usersList.sort(
+        (a, b) => (b['totalScans'] as int).compareTo(a['totalScans'] as int),
+      );
+
+      users.assignAll(usersList);
+    } catch (e) {
+      print('Error fetching users: $e');
+      Get.snackbar('Error', 'Failed to load users');
+    } finally {
+      isLoadingUsers.value = false;
+    }
+  }
+
+  // Fetch scan history for a specific user
+  Future<void> fetchUserHistory(String userId) async {
+    try {
+      selectedUserId.value = userId;
+      final userScans =
+          history.where((plant) {
+            final plantUserId = plant['userId'] ?? plant['user_id'];
+            return plantUserId?.toString() == userId;
+          }).toList();
+
+      // Sort by timestamp descending
+      userScans.sort((a, b) {
+        DateTime? dateA, dateB;
+        if (a['timestamp'] is Timestamp) {
+          dateA = (a['timestamp'] as Timestamp).toDate();
+        }
+        if (b['timestamp'] is Timestamp) {
+          dateB = (b['timestamp'] as Timestamp).toDate();
+        }
+        if (dateA == null || dateB == null) return 0;
+        return dateB.compareTo(dateA);
+      });
+
+      selectedUserHistory.assignAll(userScans);
+    } catch (e) {
+      print('Error fetching user history: $e');
+    }
+  }
+
+  // Get user's disease distribution (with caching)
+  Map<String, int> getUserDiseaseDistribution(String userId) {
+    // Return cached result if available
+    if (_userDiseaseCache.containsKey(userId)) {
+      return _userDiseaseCache[userId]!;
+    }
+
+    final Map<String, int> result = {};
+    final userScans =
+        history.where((plant) {
+          final plantUserId = plant['userId'] ?? plant['user_id'];
+          return plantUserId?.toString() == userId;
+        }).toList();
+
+    for (var plant in userScans) {
+      final disease = plant['disease']?.toString() ?? 'Unknown';
+      if (disease.trim().toLowerCase() != 'no disease detected') {
+        result[disease] = (result[disease] ?? 0) + 1;
+      }
+    }
+
+    // Cache the result
+    _userDiseaseCache[userId] = result;
+    return result;
+  }
+
+  // Clear cache when history changes
+  void _clearDiseaseCache() {
+    _userDiseaseCache.clear();
+  }
+
+  // Get selected user info
+  Map<String, dynamic>? get selectedUserInfo {
+    if (selectedUserId.value.isEmpty) return null;
+    return users.firstWhereOrNull(
+      (user) => user['uid'] == selectedUserId.value,
+    );
   }
 }

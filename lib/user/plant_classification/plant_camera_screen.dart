@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:cropcure/user/home/bottom_navigation.dart';
+import 'package:cropcure/user/home/home_controller.dart';
 import 'package:cropcure/user/plant_classification/plant_controller.dart';
 import 'package:cropcure/user/plant_classification/plant_recognizer.dart';
 import 'package:flutter/material.dart';
@@ -472,86 +473,153 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                       bottom: 30,
                       left: 40,
                       right: 40,
-                      child: GestureDetector(
-                        onTapDown: (_) => _animationController.forward(),
-                        onTapUp: (_) => _animationController.reverse(),
-                        onTapCancel: () => _animationController.reverse(),
-                        child: ScaleTransition(
-                          scale: _scaleAnimation,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.green[700]!,
-                                  Colors.greenAccent[400]!,
-                                ],
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                              ),
-                              borderRadius: BorderRadius.circular(30),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.greenAccent.withOpacity(0.3),
-                                  blurRadius: 12,
-                                  offset: Offset(0, 6),
-                                ),
-                              ],
-                            ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Re-scan Button
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12),
                             child: Material(
                               color: Colors.transparent,
                               child: InkWell(
-                                borderRadius: BorderRadius.circular(30),
                                 onTap: () {
-                                  _getPlantTreatment();
-                                  isclicked.value = !isclicked.value;
+                                  setState(() {
+                                    _hasPlantDetected = false;
+                                    _currentPlantName = '';
+                                    _currentDiseaseName.value = '';
+                                    _base64Image = '';
+                                    _hasDiseaseStored = false;
+                                    isclicked.value = false;
+                                  });
+                                  _resetDetection();
+                                  _isRecognizing.value = true;
                                 },
-                                child: Padding(
+                                borderRadius: BorderRadius.circular(30),
+                                child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                    vertical: 18,
+                                    horizontal: 24,
+                                    vertical: 14,
                                   ),
-                                  child: Center(
-                                    child: Obx(
-                                      () =>
-                                          isclicked.value
-                                              ? SizedBox(
-                                                height: 28,
-                                                width: 28,
-                                                child: CircularProgressIndicator(
-                                                  valueColor:
-                                                      AlwaysStoppedAnimation<
-                                                        Color
-                                                      >(Colors.white),
-                                                  strokeWidth: 3,
-                                                ),
-                                              )
-                                              : Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    Icons.healing,
-                                                    color: Colors.white,
-                                                    size: 28,
-                                                  ),
-                                                  SizedBox(width: 12),
-                                                  Text(
-                                                    'Get Treatment',
-                                                    style: TextStyle(
-                                                      fontSize: 20,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      letterSpacing: 1.1,
-                                                      color: Colors.white,
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[600],
+                                    borderRadius: BorderRadius.circular(30),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.blue.withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.refresh_rounded,
+                                        color: Colors.white,
+                                        size: 22,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Re-scan',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Get Treatment Button
+                          GestureDetector(
+                            onTapDown: (_) => _animationController.forward(),
+                            onTapUp: (_) => _animationController.reverse(),
+                            onTapCancel: () => _animationController.reverse(),
+                            child: ScaleTransition(
+                              scale: _scaleAnimation,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.green[700]!,
+                                      Colors.greenAccent[400]!,
+                                    ],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(30),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.greenAccent.withOpacity(
+                                        0.3,
+                                      ),
+                                      blurRadius: 12,
+                                      offset: Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(30),
+                                    onTap: () {
+                                      _getPlantTreatment();
+                                      isclicked.value = !isclicked.value;
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 18,
+                                      ),
+                                      child: Center(
+                                        child: Obx(
+                                          () =>
+                                              isclicked.value
+                                                  ? SizedBox(
+                                                    height: 28,
+                                                    width: 28,
+                                                    child: CircularProgressIndicator(
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                            Color
+                                                          >(Colors.white),
+                                                      strokeWidth: 3,
                                                     ),
+                                                  )
+                                                  : Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons.healing,
+                                                        color: Colors.white,
+                                                        size: 28,
+                                                      ),
+                                                      SizedBox(width: 12),
+                                                      Text(
+                                                        'Get Treatment',
+                                                        style: TextStyle(
+                                                          fontSize: 20,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          letterSpacing: 1.1,
+                                                          color: Colors.white,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
-                                                ],
-                                              ),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                 ],
@@ -724,50 +792,39 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                     ),
                   ),
                   const SizedBox(height: 25),
-                  // Action Buttons
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            startNewDetection();
-                          },
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Try Another'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue[600],
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+                  // Action Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        // Close dialog first
+                        Navigator.of(context).pop();
+
+                        // Refresh home data before navigating
+                        try {
+                          final homeController = Get.find<HomeController>();
+                          await homeController.fetchPlants();
+                        } catch (e) {
+                          // Controller might not exist yet, that's okay
+                          print(
+                            'HomeController not found, will refresh on navigation: $e',
+                          );
+                        }
+
+                        // Navigate to home with bottom navigation
+                        Get.offAll(() => const BottomNavigation());
+                      },
+                      icon: const Icon(Icons.done),
+                      label: const Text('Done'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green[600],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            // Close dialog first
-                            Navigator.of(context).pop();
-                            // Navigate to home with bottom navigation
-                            Get.offAll(() => const BottomNavigation());
-                          },
-                          icon: const Icon(Icons.done),
-                          label: const Text('Done'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green[600],
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),

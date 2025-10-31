@@ -73,7 +73,7 @@ flutter_launcher_icons:
     background_color: "#ffffff"
     theme_color: "#ffffff"
 launcher_name:
-  default: "Crop Cure"
+  default: "CropCure"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

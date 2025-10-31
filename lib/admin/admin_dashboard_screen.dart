@@ -1,26 +1,26 @@
 import 'package:cropcure/admin/controller.dart';
-import 'package:cropcure/admin/login.dart';
 import 'package:cropcure/admin/pdf_service.dart';
+import 'package:cropcure/admin/views/user_history_view.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 
-class ActivityLogScreen extends StatefulWidget {
-  const ActivityLogScreen({super.key});
+class AdminDashboardScreen extends StatefulWidget {
+  const AdminDashboardScreen({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
-  _ActivityLogScreenState createState() => _ActivityLogScreenState();
+  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
-class _ActivityLogScreenState extends State<ActivityLogScreen> {
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String searchQuery = "";
   String filterType = "All"; // Filter types: All, Online, Offline
   final Controller controller = Get.put(Controller());
   int _selectedSidebarTab = 0; // 0 = Insights, 1 = Trends
-  int _selectedNavItem = 0; // 0 = Dashboard, 1 = Insights, 2 = Trends
+  int _selectedNavItem =
+      0; // 0 = Dashboard, 1 = Insights, 2 = Trends, 3 = User History
   bool _isSidebarCollapsed = false;
 
   // Function to show logout confirmation dialog
@@ -155,7 +155,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
 
   // Logout action
   void _logout() {
-    Get.offAll(() => MyLogin());
+    Get.offAllNamed('/MyLogin');
     Get.snackbar('Success', 'Logged Out Success!');
   }
 
@@ -204,6 +204,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
 
   Future<void> fetchData() async {
     await controller.fetchPlants();
+    await controller.fetchUsers();
   }
 
   @override
@@ -390,6 +391,12 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                   label: 'Trends',
                   isSelected: _selectedNavItem == 2,
                   onTap: () => setState(() => _selectedNavItem = 2),
+                ),
+                _buildNavItem(
+                  icon: Icons.people_rounded,
+                  label: 'User History',
+                  isSelected: _selectedNavItem == 3,
+                  onTap: () => setState(() => _selectedNavItem = 3),
                 ),
                 const Divider(height: 32),
                 _buildNavItem(
@@ -615,9 +622,12 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
     } else if (_selectedNavItem == 1) {
       // Insights View
       return _buildInsightsView();
-    } else {
+    } else if (_selectedNavItem == 2) {
       // Trends View
       return _buildTrendsView();
+    } else {
+      // User History View
+      return _buildUserHistoryView();
     }
   }
 
@@ -646,6 +656,709 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(30),
       child: _buildTrendsTab(),
+    );
+  }
+
+  Widget _buildUserHistoryView() {
+    return UserHistoryView(controller: controller);
+  }
+
+  Widget _buildUserDetailView() {
+    return Obx(() {
+      final userInfo = controller.selectedUserInfo;
+      if (userInfo == null) {
+        return const Center(child: Text('User not found'));
+      }
+
+      final diseaseDistribution = controller.getUserDiseaseDistribution(
+        userInfo['uid'],
+      );
+
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(30),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Back Button & Header
+            Row(
+              children: [
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      controller.selectedUserId.value = '';
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.arrow_back_rounded,
+                        color: Colors.grey.shade700,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blue.shade400, Colors.blue.shade600],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.person_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        userInfo['fullname'] ?? 'Unknown User',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        userInfo['email'] ?? 'N/A',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 30),
+            // User Stats Cards
+            Row(
+              children: [
+                Expanded(
+                  child: _buildUserDetailStatCard(
+                    'Total Scans',
+                    userInfo['totalScans']?.toString() ?? '0',
+                    Icons.camera_alt_rounded,
+                    Colors.blue,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildUserDetailStatCard(
+                    'Diseases Detected',
+                    userInfo['diseaseDetected']?.toString() ?? '0',
+                    Icons.warning_amber_rounded,
+                    Colors.orange,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildUserDetailStatCard(
+                    'Healthy Plants',
+                    userInfo['healthyScans']?.toString() ?? '0',
+                    Icons.eco_rounded,
+                    Colors.green,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 30),
+            // Disease Distribution
+            if (diseaseDistribution.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.pie_chart_rounded,
+                            color: Colors.red.shade700,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Disease Distribution',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A1A1A),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    ...(() {
+                      final sorted =
+                          diseaseDistribution.entries.toList()
+                            ..sort((a, b) => b.value.compareTo(a.value));
+                      return sorted.take(10).map((entry) {
+                        final percentage =
+                            (userInfo['diseaseDetected'] as int) > 0
+                                ? (entry.value /
+                                    (userInfo['diseaseDetected'] as int) *
+                                    100)
+                                : 0.0;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      entry.key,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF1A1A1A),
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${entry.value} (${percentage.toStringAsFixed(1)}%)',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.red.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value:
+                                      (userInfo['diseaseDetected'] as int) > 0
+                                          ? entry.value /
+                                              (userInfo['diseaseDetected']
+                                                  as int)
+                                          : 0,
+                                  backgroundColor: Colors.red.shade100,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.red.shade400,
+                                  ),
+                                  minHeight: 8,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList();
+                    })(),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 30),
+            ],
+            // Scan History Table
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.history_rounded,
+                          color: Colors.blue.shade700,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Scan History',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  if (controller.selectedUserHistory.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(40),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.history_outlined,
+                              size: 48,
+                              color: Colors.grey.shade400,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No scan history for this user',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: Colors.grey.shade200,
+                          width: 1,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            headingRowHeight: 56,
+                            dataRowMinHeight: 48,
+                            headingRowColor:
+                                WidgetStateProperty.resolveWith<Color?>(
+                                  (states) => const Color(0xFFF9FAFB),
+                                ),
+                            columnSpacing: 40,
+                            horizontalMargin: 28,
+                            dividerThickness: 1,
+                            columns: [
+                              const DataColumn(
+                                label: Text(
+                                  'Timestamp',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF374151),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              const DataColumn(
+                                label: Text(
+                                  'Plant Name',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF374151),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              const DataColumn(
+                                label: Text(
+                                  'Disease',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF374151),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              const DataColumn(
+                                label: Text(
+                                  'Treatment',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF374151),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            rows:
+                                controller.selectedUserHistory.asMap().entries.map((
+                                  entry,
+                                ) {
+                                  final idx = entry.key;
+                                  final row = entry.value;
+                                  final isHealthy =
+                                      row['disease']
+                                          ?.toString()
+                                          .trim()
+                                          .toLowerCase() ==
+                                      'no disease detected';
+
+                                  return DataRow(
+                                    color:
+                                        WidgetStateProperty.resolveWith<Color?>(
+                                          (states) {
+                                            if (idx % 2 == 0) {
+                                              return const Color(0xFFFAFAFA);
+                                            }
+                                            return Colors.white;
+                                          },
+                                        ),
+                                    cells: [
+                                      DataCell(
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.access_time_rounded,
+                                              size: 16,
+                                              color: Colors.grey.shade500,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              row['timestamp'] is Timestamp
+                                                  ? DateFormat(
+                                                    'MMM dd, yyyy HH:mm',
+                                                  ).format(
+                                                    (row['timestamp']
+                                                            as Timestamp)
+                                                        .toDate(),
+                                                  )
+                                                  : row['timestamp']
+                                                          ?.toString() ??
+                                                      'N/A',
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: Color(0xFF4B5563),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      DataCell(
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.local_florist_rounded,
+                                              size: 16,
+                                              color: Colors.green.shade400,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              row['name']?.toString() ?? 'N/A',
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: Color(0xFF1F2937),
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      DataCell(
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 4,
+                                          ),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  isHealthy
+                                                      ? Colors.green.shade50
+                                                      : Colors.red.shade50,
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  isHealthy
+                                                      ? Icons
+                                                          .check_circle_rounded
+                                                      : Icons.warning_rounded,
+                                                  size: 16,
+                                                  color:
+                                                      isHealthy
+                                                          ? Colors
+                                                              .green
+                                                              .shade700
+                                                          : Colors.red.shade700,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Flexible(
+                                                  child: Text(
+                                                    row['disease']
+                                                            ?.toString() ??
+                                                        'N/A',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      color:
+                                                          isHealthy
+                                                              ? Colors
+                                                                  .green
+                                                                  .shade700
+                                                              : Colors
+                                                                  .red
+                                                                  .shade700,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      DataCell(
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 4,
+                                          ),
+                                          child:
+                                              isHealthy
+                                                  ? Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons
+                                                            .health_and_safety_rounded,
+                                                        size: 16,
+                                                        color:
+                                                            Colors
+                                                                .grey
+                                                                .shade400,
+                                                      ),
+                                                      const SizedBox(width: 6),
+                                                      Flexible(
+                                                        child: Text(
+                                                          'No treatment needed',
+                                                          style: TextStyle(
+                                                            color:
+                                                                Colors
+                                                                    .grey
+                                                                    .shade600,
+                                                            fontSize: 13,
+                                                            fontStyle:
+                                                                FontStyle
+                                                                    .italic,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  )
+                                                  : Material(
+                                                    color: Colors.transparent,
+                                                    child: InkWell(
+                                                      onTap:
+                                                          () =>
+                                                              _showPlantDetailsDialog(
+                                                                context,
+                                                                row,
+                                                              ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                      child: Container(
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 12,
+                                                              vertical: 8,
+                                                            ),
+                                                        decoration: BoxDecoration(
+                                                          gradient:
+                                                              LinearGradient(
+                                                                colors: [
+                                                                  Colors
+                                                                      .green
+                                                                      .shade400,
+                                                                  Colors
+                                                                      .green
+                                                                      .shade600,
+                                                                ],
+                                                              ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                8,
+                                                              ),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            const Icon(
+                                                              Icons
+                                                                  .visibility_rounded,
+                                                              color:
+                                                                  Colors.white,
+                                                              size: 16,
+                                                            ),
+                                                            const SizedBox(
+                                                              width: 6,
+                                                            ),
+                                                            const Text(
+                                                              'View Treatment',
+                                                              style: TextStyle(
+                                                                color:
+                                                                    Colors
+                                                                        .white,
+                                                                fontSize: 13,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildUserDetailStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  color == Colors.blue
+                      ? Colors.blue.shade400
+                      : color == Colors.orange
+                      ? Colors.orange.shade400
+                      : Colors.green.shade400,
+                  color == Colors.blue
+                      ? Colors.blue.shade600
+                      : color == Colors.orange
+                      ? Colors.orange.shade600
+                      : Colors.green.shade600,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 32),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

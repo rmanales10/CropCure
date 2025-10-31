@@ -19,6 +19,9 @@ class _HomePageState extends State<HomePage> {
   final _profileController = Get.put(ProfileController());
   final _homeController = Get.put(HomeController());
   final history = RxList<Map<String, dynamic>>([]);
+  int _currentPage = 0;
+  static const int _itemsPerPage = 5;
+
   @override
   void initState() {
     super.initState();
@@ -428,7 +431,7 @@ class _HomePageState extends State<HomePage> {
                           label: Padding(
                             padding: EdgeInsets.symmetric(vertical: 8.0),
                             child: Text(
-                              'Timestamp',
+                              'Date',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.green,
@@ -478,7 +481,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ],
                       rows:
-                          _homeController.history.asMap().entries.map((entry) {
+                          _getPaginatedRows().asMap().entries.map((entry) {
                             final idx = entry.key;
                             final row = entry.value;
                             return DataRow(
@@ -499,9 +502,7 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                     child: Text(
                                       row['timestamp'] is Timestamp
-                                          ? DateFormat(
-                                            'MMM dd, yyyy HH:mm',
-                                          ).format(
+                                          ? DateFormat('MMM dd, yyyy').format(
                                             (row['timestamp'] as Timestamp)
                                                 .toDate(),
                                           )
@@ -592,9 +593,220 @@ class _HomePageState extends State<HomePage> {
                   ),
                 );
               }),
+              const SizedBox(height: 16),
+              // Pagination Controls
+              Obx(() {
+                if (_homeController.history.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return _buildPaginationControls();
+              }),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _getPaginatedRows() {
+    final allHistory = _homeController.history;
+    final startIndex = _currentPage * _itemsPerPage;
+    final endIndex = (startIndex + _itemsPerPage).clamp(0, allHistory.length);
+    return allHistory.sublist(startIndex.clamp(0, allHistory.length), endIndex);
+  }
+
+  int _getTotalPages() {
+    final totalItems = _homeController.history.length;
+    if (totalItems == 0) return 1;
+    return (totalItems / _itemsPerPage).ceil();
+  }
+
+  Widget _buildPaginationControls() {
+    final totalPages = _getTotalPages();
+    final totalItems = _homeController.history.length;
+    final startItem = totalItems == 0 ? 0 : (_currentPage * _itemsPerPage) + 1;
+    final endItem = ((_currentPage + 1) * _itemsPerPage).clamp(0, totalItems);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade200, width: 1),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Items info
+          Flexible(
+            child: Text(
+              totalItems == 0
+                  ? 'No items'
+                  : 'Showing ${startItem}-${endItem} of $totalItems',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.green.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Pagination buttons
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Previous button
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap:
+                      _currentPage > 0
+                          ? () {
+                            setState(() {
+                              _currentPage--;
+                            });
+                          }
+                          : null,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          _currentPage > 0
+                              ? Colors.green.shade600
+                              : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow:
+                          _currentPage > 0
+                              ? [
+                                BoxShadow(
+                                  color: Colors.green.withOpacity(0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                              : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.chevron_left_rounded,
+                          color:
+                              _currentPage > 0
+                                  ? Colors.white
+                                  : Colors.grey.shade600,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Prev',
+                          style: TextStyle(
+                            color:
+                                _currentPage > 0
+                                    ? Colors.white
+                                    : Colors.grey.shade600,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Page indicator
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.shade300, width: 1),
+                ),
+                child: Text(
+                  'Page ${_currentPage + 1} of ${totalPages}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Next button
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap:
+                      _currentPage < totalPages - 1
+                          ? () {
+                            setState(() {
+                              _currentPage++;
+                            });
+                          }
+                          : null,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          _currentPage < totalPages - 1
+                              ? Colors.green.shade600
+                              : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow:
+                          _currentPage < totalPages - 1
+                              ? [
+                                BoxShadow(
+                                  color: Colors.green.withOpacity(0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                              : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Next',
+                          style: TextStyle(
+                            color:
+                                _currentPage < totalPages - 1
+                                    ? Colors.white
+                                    : Colors.grey.shade600,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color:
+                              _currentPage < totalPages - 1
+                                  ? Colors.white
+                                  : Colors.grey.shade600,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
