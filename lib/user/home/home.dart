@@ -21,6 +21,8 @@ class _HomePageState extends State<HomePage> {
   final history = RxList<Map<String, dynamic>>([]);
   int _currentPage = 0;
   static const int _itemsPerPage = 5;
+  DateTime? _startDate;
+  DateTime? _endDate;
 
   @override
   void initState() {
@@ -375,14 +377,127 @@ class _HomePageState extends State<HomePage> {
               }),
               const SizedBox(height: 24),
               // Table
-              Text(
-                "Scan History",
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 17,
-                  color: Colors.green.shade700,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Scan History",
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 17,
+                      color: Colors.green.shade700,
+                    ),
+                  ),
+                  // Date Filter Button
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _showDateRangePicker(),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.green.shade200,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.filter_list_rounded,
+                              color: Colors.green.shade700,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Filter',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+              // Date Range Display
+              if (_startDate != null || _endDate != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade200, width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              size: 16,
+                              color: Colors.green.shade700,
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                _startDate != null && _endDate != null
+                                    ? '${DateFormat('MMM dd, yyyy').format(_startDate!)} - ${DateFormat('MMM dd, yyyy').format(_endDate!)}'
+                                    : _startDate != null
+                                    ? 'From ${DateFormat('MMM dd, yyyy').format(_startDate!)}'
+                                    : 'Until ${DateFormat('MMM dd, yyyy').format(_endDate!)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.green.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              _startDate = null;
+                              _endDate = null;
+                              _currentPage = 0;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 16,
+                              color: Colors.green.shade700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               Obx(() {
                 if (_homeController.isLoading.value) {
@@ -391,16 +506,31 @@ class _HomePageState extends State<HomePage> {
                   );
                 }
 
-                if (_homeController.history.isEmpty) {
+                final filteredHistory = _getFilteredHistory();
+
+                if (filteredHistory.isEmpty) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        'No scan history available',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade600,
-                        ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.filter_alt_outlined,
+                            size: 48,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _startDate != null || _endDate != null
+                                ? 'No scans found in the selected date range'
+                                : 'No scan history available',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey.shade600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -608,22 +738,389 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  List<Map<String, dynamic>> _getPaginatedRows() {
+  List<Map<String, dynamic>> _getFilteredHistory() {
     final allHistory = _homeController.history;
+
+    if (_startDate == null && _endDate == null) {
+      return allHistory;
+    }
+
+    return allHistory.where((item) {
+      if (item['timestamp'] == null) return false;
+
+      DateTime itemDate;
+      if (item['timestamp'] is Timestamp) {
+        itemDate = (item['timestamp'] as Timestamp).toDate();
+      } else if (item['timestamp'] is String) {
+        itemDate = DateTime.parse(item['timestamp']);
+      } else {
+        return false;
+      }
+
+      // Normalize dates to just the date part (remove time)
+      itemDate = DateTime(itemDate.year, itemDate.month, itemDate.day);
+
+      bool matches = true;
+      if (_startDate != null) {
+        final start = DateTime(
+          _startDate!.year,
+          _startDate!.month,
+          _startDate!.day,
+        );
+        matches =
+            matches &&
+            (itemDate.isAfter(start) || itemDate.isAtSameMomentAs(start));
+      }
+      if (_endDate != null) {
+        final end = DateTime(_endDate!.year, _endDate!.month, _endDate!.day);
+        matches =
+            matches &&
+            (itemDate.isBefore(end) || itemDate.isAtSameMomentAs(end));
+      }
+
+      return matches;
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _getPaginatedRows() {
+    final filteredHistory = _getFilteredHistory();
     final startIndex = _currentPage * _itemsPerPage;
-    final endIndex = (startIndex + _itemsPerPage).clamp(0, allHistory.length);
-    return allHistory.sublist(startIndex.clamp(0, allHistory.length), endIndex);
+    final endIndex = (startIndex + _itemsPerPage).clamp(
+      0,
+      filteredHistory.length,
+    );
+    return filteredHistory.sublist(
+      startIndex.clamp(0, filteredHistory.length),
+      endIndex,
+    );
   }
 
   int _getTotalPages() {
-    final totalItems = _homeController.history.length;
+    final totalItems = _getFilteredHistory().length;
     if (totalItems == 0) return 1;
     return (totalItems / _itemsPerPage).ceil();
   }
 
+  Future<void> _showDateRangePicker() async {
+    final DateTime now = DateTime.now();
+    final DateTime firstDate = now.subtract(const Duration(days: 365));
+    final DateTime lastDate = now.add(const Duration(days: 1));
+
+    DateTime? tempStartDate = _startDate;
+    DateTime? tempEndDate = _endDate;
+
+    final result = await showDialog<DateTimeRange?>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.9,
+                  maxHeight: MediaQuery.of(context).size.height * 0.7,
+                ),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.filter_list_rounded,
+                                color: Colors.green.shade700,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Filter by Date Range',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close, color: Colors.grey.shade600),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    // Start Date
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: tempStartDate ?? now,
+                          firstDate: firstDate,
+                          lastDate: lastDate,
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: ColorScheme.light(
+                                  primary: Colors.green.shade700,
+                                  onPrimary: Colors.white,
+                                  surface: Colors.white,
+                                  onSurface: Colors.black87,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null) {
+                          setModalState(() {
+                            tempStartDate = picked;
+                            if (tempEndDate != null &&
+                                tempEndDate!.isBefore(picked)) {
+                              tempEndDate = null;
+                            }
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              color: Colors.green.shade700,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Start Date',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    tempStartDate != null
+                                        ? DateFormat(
+                                          'MMM dd, yyyy',
+                                        ).format(tempStartDate!)
+                                        : 'Select start date',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color:
+                                          tempStartDate != null
+                                              ? Colors.black87
+                                              : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: Colors.grey.shade400,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // End Date
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: tempEndDate ?? (tempStartDate ?? now),
+                          firstDate: tempStartDate ?? firstDate,
+                          lastDate: lastDate,
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: ColorScheme.light(
+                                  primary: Colors.green.shade700,
+                                  onPrimary: Colors.white,
+                                  surface: Colors.white,
+                                  onSurface: Colors.black87,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null) {
+                          setModalState(() {
+                            tempEndDate = picked;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              color: Colors.green.shade700,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'End Date',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    tempEndDate != null
+                                        ? DateFormat(
+                                          'MMM dd, yyyy',
+                                        ).format(tempEndDate!)
+                                        : 'Select end date',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color:
+                                          tempEndDate != null
+                                              ? Colors.black87
+                                              : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: Colors.grey.shade400,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () {
+                              setModalState(() {
+                                tempStartDate = null;
+                                tempEndDate = null;
+                              });
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(color: Colors.grey.shade300),
+                              ),
+                            ),
+                            child: Text(
+                              'Clear',
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).pop(
+                                tempStartDate != null && tempEndDate != null
+                                    ? DateTimeRange(
+                                      start: tempStartDate!,
+                                      end: tempEndDate!,
+                                    )
+                                    : null,
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade700,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                            ),
+                            child: const Text(
+                              'Apply Filter',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() {
+        _startDate = result.start;
+        _endDate = result.end;
+        _currentPage = 0; // Reset to first page when filter changes
+      });
+    }
+  }
+
   Widget _buildPaginationControls() {
     final totalPages = _getTotalPages();
-    final totalItems = _homeController.history.length;
+    final totalItems = _getFilteredHistory().length;
     final startItem = totalItems == 0 ? 0 : (_currentPage * _itemsPerPage) + 1;
     final endItem = ((_currentPage + 1) * _itemsPerPage).clamp(0, totalItems);
 
