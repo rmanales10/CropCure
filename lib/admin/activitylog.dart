@@ -1,5 +1,6 @@
 import 'package:cropcure/admin/controller.dart';
 import 'package:cropcure/admin/login.dart';
+import 'package:cropcure/admin/pdf_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
@@ -18,6 +19,9 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
   String searchQuery = "";
   String filterType = "All"; // Filter types: All, Online, Offline
   final Controller controller = Get.put(Controller());
+  int _selectedSidebarTab = 0; // 0 = Insights, 1 = Trends
+  int _selectedNavItem = 0; // 0 = Dashboard, 1 = Insights, 2 = Trends
+  bool _isSidebarCollapsed = false;
 
   // Function to show logout confirmation dialog
   Future<void> _showLogoutDialog() async {
@@ -155,6 +159,43 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
     Get.snackbar('Success', 'Logged Out Success!');
   }
 
+  // Generate PDF Report
+  Future<void> _generatePdfReport() async {
+    try {
+      final totalScans = controller.history.length;
+      final diseaseDetected = controller.totalDiseases;
+      final healthyScans = totalScans - diseaseDetected;
+
+      await PdfService.generateAnalyticsReport(
+        historyData: controller.history,
+        totalScans: totalScans,
+        diseaseDetected: diseaseDetected,
+        healthyScans: healthyScans,
+        diseaseScansPerDay: controller.diseaseScansPerDay,
+      );
+
+      Get.snackbar(
+        'Success',
+        'PDF Report Generated Successfully!',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green.shade600,
+        colorText: Colors.white,
+        icon: const Icon(Icons.check_circle, color: Colors.white),
+        duration: const Duration(seconds: 2),
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to generate PDF: $e',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red.shade600,
+        colorText: Colors.white,
+        icon: const Icon(Icons.error, color: Colors.white),
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -169,101 +210,442 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFB),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        centerTitle: false,
-        toolbarHeight: 80,
-        title: Padding(
-          padding: const EdgeInsets.only(top: 20, left: 30),
+      body: Row(
+        children: [
+          // Left Sidebar
+          _buildLeftSidebar(),
+          // Main Content
+          Expanded(
+            child: Column(
+              children: [
+                // AppBar
+                _buildAppBar(),
+                // Body Content
+                Expanded(child: _buildMainContent()),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeftSidebar() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: _isSidebarCollapsed ? 80 : 280,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 0),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Sidebar Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.green.shade400, Colors.green.shade700],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child:
+                _isSidebarCollapsed
+                    ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.admin_panel_settings_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _isSidebarCollapsed = false;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                width: 24,
+                                height: 24,
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                    : Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.admin_panel_settings_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'Admin',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  height: 1.0,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const Text(
+                                'Dashboard',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white70,
+                                  height: 1.0,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _isSidebarCollapsed = true;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.chevron_left,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+          ),
+          // Navigation Items
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              children: [
+                _buildNavItem(
+                  icon: Icons.dashboard_rounded,
+                  label: 'Dashboard',
+                  isSelected: _selectedNavItem == 0,
+                  onTap: () => setState(() => _selectedNavItem = 0),
+                ),
+                _buildNavItem(
+                  icon: Icons.lightbulb_outline_rounded,
+                  label: 'Insights',
+                  isSelected: _selectedNavItem == 1,
+                  onTap: () => setState(() => _selectedNavItem = 1),
+                ),
+                _buildNavItem(
+                  icon: Icons.show_chart_rounded,
+                  label: 'Trends',
+                  isSelected: _selectedNavItem == 2,
+                  onTap: () => setState(() => _selectedNavItem = 2),
+                ),
+                const Divider(height: 32),
+                _buildNavItem(
+                  icon: Icons.picture_as_pdf_rounded,
+                  label: 'Export PDF',
+                  isSelected: false,
+                  onTap: _generatePdfReport,
+                ),
+              ],
+            ),
+          ),
+          // Logout Button
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: Colors.grey.shade200, width: 1),
+              ),
+            ),
+            child: _buildNavItem(
+              icon: Icons.logout_rounded,
+              label: 'Logout',
+              isSelected: false,
+              onTap: _showLogoutDialog,
+              isLogout: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    bool isLogout = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color:
+                isSelected
+                    ? Colors.green.shade50
+                    : (isLogout ? Colors.red.shade50 : Colors.transparent),
+            borderRadius: BorderRadius.circular(12),
+            border:
+                isSelected
+                    ? Border.all(color: Colors.green.shade300, width: 1.5)
+                    : null,
+          ),
           child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.green.shade400, Colors.green.shade700],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.green.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.analytics_outlined,
-                  color: Colors.white,
-                  size: 28,
-                ),
+              Icon(
+                icon,
+                size: 22,
+                color:
+                    isSelected
+                        ? Colors.green.shade700
+                        : (isLogout
+                            ? Colors.red.shade700
+                            : Colors.grey.shade600),
               ),
-              const SizedBox(width: 16),
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Analytics Dashboard',
+              if (!_isSidebarCollapsed) ...[
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    label,
                     style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A),
-                      letterSpacing: -0.5,
+                      fontSize: 14,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color:
+                          isSelected
+                              ? Colors.green.shade700
+                              : (isLogout
+                                  ? Colors.red.shade700
+                                  : Colors.grey.shade700),
                     ),
                   ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Monitor disease scans and trends',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.normal,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ],
           ),
         ),
-        actions: [
+      ),
+    );
+  }
+
+  Widget _buildAppBar() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.green.shade400, Colors.green.shade700],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.green.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.analytics_outlined,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Analytics Dashboard',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                    letterSpacing: -0.5,
+                    height: 1.0,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 1),
+                const Text(
+                  'Monitor disease scans and trends',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.normal,
+                    color: Color(0xFF6B7280),
+                    height: 1.0,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const Spacer(),
+          // PDF Export Button
           Padding(
-            padding: const EdgeInsets.only(right: 40, top: 20),
+            padding: const EdgeInsets.only(right: 12),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.red.shade200, width: 1),
-              ),
-              child: IconButton(
-                icon: Icon(
-                  Icons.logout_rounded,
-                  color: Colors.red.shade700,
-                  size: 22,
+                gradient: LinearGradient(
+                  colors: [Colors.green.shade500, Colors.green.shade700],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                 ),
-                onPressed: _showLogoutDialog,
-                tooltip: 'Logout',
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _generatePdfReport,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.picture_as_pdf_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Export PDF',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 30),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildStatsCards(),
-              const SizedBox(height: 30),
-              diseaseScanAndHistoryCard(),
-            ],
-          ),
-        ),
+    );
+  }
+
+  Widget _buildMainContent() {
+    if (_selectedNavItem == 0) {
+      // Dashboard View
+      return _buildDashboardView();
+    } else if (_selectedNavItem == 1) {
+      // Insights View
+      return _buildInsightsView();
+    } else {
+      // Trends View
+      return _buildTrendsView();
+    }
+  }
+
+  Widget _buildDashboardView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildStatsCards(),
+          const SizedBox(height: 30),
+          diseaseScanAndHistoryCard(),
+        ],
       ),
+    );
+  }
+
+  Widget _buildInsightsView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(30),
+      child: _buildInsightsTab(),
+    );
+  }
+
+  Widget _buildTrendsView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(30),
+      child: _buildTrendsTab(),
     );
   }
 
@@ -1286,6 +1668,619 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSidebar() {
+    final monthName = DateFormat('MMMM yyyy').format(DateTime.now());
+
+    return Drawer(
+      width: 420,
+      backgroundColor: Colors.white,
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.green.shade400, Colors.green.shade700],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.trending_up_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Insights & Trends',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              'This Month Analysis',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.calendar_today,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        monthName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Tabs
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              border: Border(
+                bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildTabButton(
+                    label: 'Insights',
+                    icon: Icons.lightbulb_outline_rounded,
+                    isSelected: _selectedSidebarTab == 0,
+                    onTap: () => setState(() => _selectedSidebarTab = 0),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildTabButton(
+                    label: 'Trends',
+                    icon: Icons.show_chart_rounded,
+                    isSelected: _selectedSidebarTab == 1,
+                    onTap: () => setState(() => _selectedSidebarTab = 1),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child:
+                  _selectedSidebarTab == 0
+                      ? _buildInsightsTab()
+                      : _buildTrendsTab(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.green.shade50 : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? Colors.green.shade300 : Colors.transparent,
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color:
+                    isSelected ? Colors.green.shade700 : Colors.grey.shade600,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color:
+                      isSelected ? Colors.green.shade700 : Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInsightsTab() {
+    return Obx(() {
+      final monthTotal = controller.thisMonthTotalScans;
+      final monthDiseases = controller.thisMonthDiseases;
+      final monthHealthy = controller.thisMonthHealthy;
+      final weekly = controller.weeklyComparison;
+      final diseaseDistribution = controller.thisMonthDiseaseDistribution;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // This Month Summary
+          _buildInsightCard(
+            icon: Icons.calendar_month_rounded,
+            title: 'This Month Overview',
+            color: Colors.blue,
+            child: Column(
+              children: [
+                _buildStatRow(
+                  'Total Scans',
+                  monthTotal.toString(),
+                  Colors.blue,
+                ),
+                const SizedBox(height: 12),
+                _buildStatRow(
+                  'Diseases Detected',
+                  monthDiseases.toString(),
+                  Colors.orange,
+                ),
+                const SizedBox(height: 12),
+                _buildStatRow(
+                  'Healthy Plants',
+                  monthHealthy.toString(),
+                  Colors.green,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Weekly Comparison
+          _buildInsightCard(
+            icon: Icons.compare_arrows_rounded,
+            title: 'Weekly Comparison',
+            color: Colors.purple,
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'This Week',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          weekly['current'].toString(),
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A1A1A),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Last Week',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          weekly['previous'].toString(),
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A1A1A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color:
+                        (weekly['change'] as double) >= 0
+                            ? Colors.green.shade50
+                            : Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        (weekly['change'] as double) >= 0
+                            ? Icons.trending_up_rounded
+                            : Icons.trending_down_rounded,
+                        color:
+                            (weekly['change'] as double) >= 0
+                                ? Colors.green.shade700
+                                : Colors.red.shade700,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${(weekly['change'] as double).toStringAsFixed(1)}% ${(weekly['change'] as double) >= 0 ? 'increase' : 'decrease'}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color:
+                              (weekly['change'] as double) >= 0
+                                  ? Colors.green.shade700
+                                  : Colors.red.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Disease Distribution
+          if (diseaseDistribution.isNotEmpty)
+            _buildInsightCard(
+              icon: Icons.pie_chart_rounded,
+              title: 'Top Diseases This Month',
+              color: Colors.red,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children:
+                    (() {
+                      final sorted =
+                          diseaseDistribution.entries.toList()
+                            ..sort((a, b) => b.value.compareTo(a.value));
+                      return sorted.take(5).map((entry) {
+                        final percentage =
+                            monthDiseases > 0
+                                ? (entry.value / monthDiseases * 100)
+                                : 0.0;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      entry.key,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF1A1A1A),
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${entry.value} (${percentage.toStringAsFixed(1)}%)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.red.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value:
+                                      monthDiseases > 0
+                                          ? entry.value / monthDiseases
+                                          : 0,
+                                  backgroundColor: Colors.red.shade100,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.red.shade400,
+                                  ),
+                                  minHeight: 6,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList();
+                    })(),
+              ),
+            ),
+        ],
+      );
+    });
+  }
+
+  Widget _buildTrendsTab() {
+    return Obx(() {
+      final dailyTrend = controller.thisMonthDailyTrend;
+      final sortedDays =
+          dailyTrend.keys.toList()..sort((a, b) {
+            final dateA = DateFormat('MMM dd').parse(a);
+            final dateB = DateFormat('MMM dd').parse(b);
+            return dateA.compareTo(dateB);
+          });
+      final maxValue =
+          dailyTrend.values.isEmpty
+              ? 1
+              : dailyTrend.values.reduce((a, b) => a > b ? a : b);
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Daily Trend Card
+          _buildInsightCard(
+            icon: Icons.timeline_rounded,
+            title: 'Daily Scan Trend',
+            color: Colors.green,
+            child:
+                sortedDays.isEmpty
+                    ? Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Center(
+                        child: Text(
+                          'No data available for this month',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+                    )
+                    : Column(
+                      children:
+                          sortedDays.map((day) {
+                            final value = dailyTrend[day] ?? 0;
+                            final percentage =
+                                maxValue > 0 ? value / maxValue : 0.0;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        day,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF1A1A1A),
+                                        ),
+                                      ),
+                                      Text(
+                                        value.toString(),
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: percentage,
+                                      backgroundColor: Colors.green.shade100,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.green.shade400,
+                                      ),
+                                      minHeight: 8,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                    ),
+          ),
+          const SizedBox(height: 16),
+          // Insights Summary
+          _buildInsightCard(
+            icon: Icons.insights_rounded,
+            title: 'Key Insights',
+            color: Colors.indigo,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildInsightItem(
+                  Icons.calendar_today,
+                  'This month\'s scans: ${controller.thisMonthTotalScans}',
+                  Colors.blue,
+                ),
+                const SizedBox(height: 12),
+                _buildInsightItem(
+                  Icons.warning_amber_rounded,
+                  'Disease detection rate: ${controller.thisMonthTotalScans > 0 ? (controller.thisMonthDiseases / controller.thisMonthTotalScans * 100).toStringAsFixed(1) : 0}%',
+                  Colors.orange,
+                ),
+                const SizedBox(height: 12),
+                _buildInsightItem(
+                  Icons.eco_rounded,
+                  'Healthy plant rate: ${controller.thisMonthTotalScans > 0 ? (controller.thisMonthHealthy / controller.thisMonthTotalScans * 100).toStringAsFixed(1) : 0}%',
+                  Colors.green,
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    });
+  }
+
+  Widget _buildInsightCard({
+    required IconData icon,
+    required String title,
+    required Color color,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, String value, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInsightItem(IconData icon, String text, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF4B5563)),
+          ),
+        ),
+      ],
     );
   }
 }
