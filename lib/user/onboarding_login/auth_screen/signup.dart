@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'otp_verification.dart'; // Import OTP verification page
 import 'package:cropcure/services/sms_service.dart'; // Import SMS service
@@ -91,11 +92,10 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
               controller: _emailController,
             ),
             const SizedBox(height: 10),
-            _buildTextField(
+            _buildPhoneNumberField(
               "Phone Number",
-              hintText: "09XXXXXXXXX",
+              hintText: "",
               controller: _phoneController,
-              keyboardType: TextInputType.phone,
             ),
             const SizedBox(height: 10),
             _buildPasswordField(
@@ -141,6 +141,60 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: const TextStyle(color: Colors.black),
+            fillColor: Colors.white,
+            filled: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(15),
+              borderSide: const BorderSide(
+                color: Color.fromARGB(255, 15, 129, 19),
+                width: 2,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(15),
+              borderSide: const BorderSide(
+                color: Color.fromARGB(255, 15, 129, 19),
+                width: 2,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 15,
+              horizontal: 20,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Phone Number Field with 11 digit limit
+  Widget _buildPhoneNumberField(
+    String label, {
+    required String hintText,
+    TextEditingController? controller,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 5),
+        TextFormField(
+          controller: controller,
+          keyboardType: TextInputType.phone,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(11),
+          ],
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: const TextStyle(color: Colors.black),

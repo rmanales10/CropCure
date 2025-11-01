@@ -1,11 +1,58 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class GeminiConfig {
   // ============================================================================
   // API CONFIGURATION
   // ============================================================================
 
-  // Gemini API Key - Replace with your actual API key
+  // Fallback API Key (used if Firestore fetch fails)
   // Get your API key from: https://ai.google.dev/gemini-api/docs/api-key
-  static const String apiKey = 'AIzaSyDIcyFPmR_mSY14aKV24UrPuOKpAtQdvKQ';
+  static const String _fallbackApiKey =
+      'AIzaSyDIcyFPmR_mSY14aKV24UrPuOKpAtQdvKQ';
+
+  // Cached API key from Firestore
+  static String? _cachedApiKey;
+  static DateTime? _cacheTimestamp;
+  static const Duration _cacheDuration = Duration(hours: 1); // Cache for 1 hour
+
+  /// Fetches API key from Firestore (collection: 'ai', document: 'ai', field: 'apiKey')
+  /// Uses caching to avoid repeated Firestore calls
+  static Future<String> getApiKey() async {
+    // Return cached key if still valid
+    if (_cachedApiKey != null &&
+        _cacheTimestamp != null &&
+        DateTime.now().difference(_cacheTimestamp!) < _cacheDuration) {
+      return _cachedApiKey!;
+    }
+
+    try {
+      final doc =
+          await FirebaseFirestore.instance.collection('ai').doc('ai').get();
+
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data() as Map<String, dynamic>;
+        final apiKey = data['apiKey'] as String?;
+
+        if (apiKey != null && apiKey.isNotEmpty) {
+          _cachedApiKey = apiKey;
+          _cacheTimestamp = DateTime.now();
+          return apiKey;
+        }
+      }
+    } catch (e) {
+      print('Error fetching API key from Firestore: $e');
+    }
+
+    // Fallback to hardcoded key if Firestore fetch fails
+    print('Using fallback API key');
+    return _fallbackApiKey;
+  }
+
+  /// Clears the cached API key (useful for forcing refresh)
+  static void clearCache() {
+    _cachedApiKey = null;
+    _cacheTimestamp = null;
+  }
 
   // ============================================================================
   // MODEL CONFIGURATIONS
@@ -107,7 +154,8 @@ class GeminiConfig {
   }
 
   /// Check if the current configuration is valid
-  static bool isValid() {
+  static Future<bool> isValid() async {
+    final apiKey = await getApiKey();
     return apiKey.isNotEmpty &&
         apiKey != 'YOUR_API_KEY_HERE' &&
         imageModel.isNotEmpty &&

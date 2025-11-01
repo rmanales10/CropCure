@@ -38,17 +38,9 @@ android {
          signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+           
     }
     }
-}
-dependencies {
-    // ... other dependencies ...
-    implementation("org.tensorflow:tensorflow-lite:2.5.0")
-    implementation("org.tensorflow:tensorflow-lite-gpu:2.5.0")
 }
 
 flutter {

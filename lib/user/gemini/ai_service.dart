@@ -39,8 +39,8 @@ class AiService extends GetxController {
     String autoID = generateUniqueId();
     log('click');
 
-    // Your API Key (remember to protect this key in production)
-    const apiKey = GeminiConfig.apiKey;
+    // Fetch API Key from Firestore
+    final apiKey = await GeminiConfig.getApiKey();
 
     // Initialize the model using Gemini 2.5 Flash for better performance
     final model = GenerativeModel(

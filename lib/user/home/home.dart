@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:cropcure/user/home/home_controller.dart';
+import 'package:cropcure/user/home/daily_reminder_controller.dart';
 import 'package:cropcure/user/profile/profile_controller.dart';
+import 'package:cropcure/user/chatbot/chatbot_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -18,11 +19,23 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final _profileController = Get.put(ProfileController());
   final _homeController = Get.put(HomeController());
+  final _reminderController = Get.put(DailyReminderController());
   final history = RxList<Map<String, dynamic>>([]);
   int _currentPage = 0;
   static const int _itemsPerPage = 5;
   DateTime? _startDate;
   DateTime? _endDate;
+
+  // Helper function to check if a plant is healthy
+  bool _isPlantHealthy(String? disease) {
+    if (disease == null) return false;
+    final diseaseLower = disease.toString().trim().toLowerCase();
+    return diseaseLower == 'no disease detected' ||
+        diseaseLower == 'healthy plant' ||
+        diseaseLower == 'healthy' ||
+        diseaseLower.contains('healthy') ||
+        diseaseLower.contains('no disease');
+  }
 
   @override
   void initState() {
@@ -56,7 +69,11 @@ class _HomePageState extends State<HomePage> {
 
                   children: [
                     _buildGreetingSection(),
-                    diseaseScanAndHistoryCard(),
+                    _buildDailyReminderCard(),
+                    _buildScanHistoryCard(),
+                    _buildAIChatbotCard(),
+                    _buildFAQsCard(),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -184,9 +201,247 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget diseaseScanAndHistoryCard() {
+  Widget _buildDailyReminderCard() {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0),
+      child: Card(
+        elevation: 5,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.green.shade50, Colors.green.shade100],
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade400,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Obx(() {
+                    if (_reminderController.isLoadingReminder.value) {
+                      return SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      );
+                    }
+                    return const Icon(
+                      Icons.water_drop_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    );
+                  }),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Daily Reminder',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Obx(() {
+                        return Text(
+                          _reminderController.reminder.value,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade800,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAIChatbotCard() {
+    return Padding(
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0),
+      child: Card(
+        elevation: 5,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: InkWell(
+          onTap: () {
+            Get.to(() => const ChatbotScreen());
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blue.shade400, Colors.blue.shade600],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.smart_toy_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'AI Chatbot',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey.shade800,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Ask about treatments and tutorials',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: Colors.grey.shade400,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFAQsCard() {
+    return Padding(
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0),
+      child: Card(
+        elevation: 5,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: InkWell(
+          onTap: () {
+            _showFAQsDialog();
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.orange.shade400, Colors.orange.shade600],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.orange.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.help_outline_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'FAQs',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey.shade800,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Frequently Asked Questions',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: Colors.grey.shade400,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScanHistoryCard() {
+    return Padding(
+      padding: const EdgeInsets.only(
+        left: 16.0,
+        right: 16.0,
+        top: 16.0,
+        bottom: 16.0,
+      ),
       child: Card(
         elevation: 5,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -195,187 +450,6 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: const [
-                  Icon(Icons.analytics, color: Colors.green, size: 28),
-                  SizedBox(width: 10),
-                  Text(
-                    "Disease Scans & History",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              // Chart
-              Obx(() {
-                if (_homeController.isLoading.value) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: Colors.green),
-                  );
-                }
-
-                if (_homeController.history.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.history,
-                          size: 48,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No scan history yet',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final scansMap = _homeController.diseaseScansPerDay;
-                final days = scansMap.keys.toList()..sort();
-                final diseaseScans = days.map((d) => scansMap[d]!).toList();
-
-                return SizedBox(
-                  height: 200,
-                  child: LineChart(
-                    LineChartData(
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: true,
-                        getDrawingHorizontalLine:
-                            (value) => FlLine(
-                              color: Colors.green.shade50,
-                              strokeWidth: 1,
-                            ),
-                        getDrawingVerticalLine:
-                            (value) => FlLine(
-                              color: Colors.green.shade50,
-                              strokeWidth: 1,
-                            ),
-                      ),
-                      titlesData: FlTitlesData(
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 32,
-                            getTitlesWidget:
-                                (value, meta) => Text(
-                                  value.toInt().toString(),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                          ),
-                        ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            getTitlesWidget: (value, meta) {
-                              int idx = value.toInt();
-                              if (idx >= 0 && idx < days.length) {
-                                return Text(
-                                  days[idx],
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                  ),
-                                );
-                              }
-                              return const SizedBox.shrink();
-                            },
-                            interval: 1,
-                          ),
-                        ),
-                        topTitles: AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        rightTitles: AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                      ),
-                      borderData: FlBorderData(
-                        show: true,
-                        border: Border.all(color: Colors.green, width: 1),
-                      ),
-                      minX: 0,
-                      maxX: (days.length - 1).toDouble(),
-                      minY: 0,
-                      maxY:
-                          (diseaseScans.isEmpty
-                                  ? 1
-                                  : diseaseScans.reduce(
-                                        (a, b) => a > b ? a : b,
-                                      ) +
-                                      2)
-                              .toDouble(),
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: List.generate(
-                            diseaseScans.length,
-                            (i) => FlSpot(
-                              i.toDouble(),
-                              diseaseScans[i].toDouble(),
-                            ),
-                          ),
-                          isCurved: true,
-                          color: Colors.green,
-                          barWidth: 4,
-                          dotData: FlDotData(
-                            show: true,
-                            getDotPainter:
-                                (spot, percent, bar, index) =>
-                                    FlDotCirclePainter(
-                                      radius: 6,
-                                      color: Colors.white,
-                                      strokeWidth: 3,
-                                      strokeColor: Colors.green,
-                                    ),
-                          ),
-                          belowBarData: BarAreaData(
-                            show: true,
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.green.withOpacity(0.3),
-                                Colors.green.withOpacity(0.0),
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                        ),
-                      ],
-                      lineTouchData: LineTouchData(
-                        enabled: true,
-                        touchTooltipData: LineTouchTooltipData(
-                          getTooltipItems: (touchedSpots) {
-                            return touchedSpots.map((spot) {
-                              return LineTooltipItem(
-                                '${spot.y.toInt()}',
-                                const TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              );
-                            }).toList();
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }),
-              const SizedBox(height: 24),
               // Table
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -587,7 +661,7 @@ class _HomePageState extends State<HomePage> {
                           label: Padding(
                             padding: EdgeInsets.symmetric(vertical: 8.0),
                             child: Text(
-                              'Disease',
+                              'Contidtion',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.green,
@@ -660,9 +734,46 @@ class _HomePageState extends State<HomePage> {
                                       vertical: 8.0,
                                       horizontal: 4.0,
                                     ),
-                                    child: Text(
-                                      row['disease']?.toString() ?? 'N/A',
-                                      style: const TextStyle(fontSize: 15),
+                                    child: Builder(
+                                      builder: (context) {
+                                        final isHealthy = _isPlantHealthy(
+                                          row['disease']?.toString(),
+                                        );
+                                        return Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            // Icon for healthy plants
+                                            if (isHealthy)
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.check_circle_rounded,
+                                                    size: 18,
+                                                    color:
+                                                        Colors.green.shade700,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                ],
+                                              ),
+                                            Flexible(
+                                              child: Text(
+                                                row['disease']?.toString() ??
+                                                    'N/A',
+                                                style: TextStyle(
+                                                  fontSize: 15,
+                                                  color:
+                                                      isHealthy
+                                                          ? Colors
+                                                              .green
+                                                              .shade700
+                                                          : Colors.red.shade700,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
                                     ),
                                   ),
                                 ),
@@ -673,11 +784,9 @@ class _HomePageState extends State<HomePage> {
                                       horizontal: 4.0,
                                     ),
                                     child:
-                                        row['disease']
-                                                    ?.toString()
-                                                    .trim()
-                                                    .toLowerCase() ==
-                                                'no disease detected'
+                                        _isPlantHealthy(
+                                              row['disease']?.toString(),
+                                            )
                                             ? const Text(
                                               'No treatment needed',
                                               style: TextStyle(
@@ -1393,8 +1502,7 @@ class _HomePageState extends State<HomePage> {
                       isDisease: true,
                     ),
                     if (plant['disease'] != null &&
-                        plant['disease'].toString().trim().toLowerCase() !=
-                            'no disease detected') ...[
+                        !_isPlantHealthy(plant['disease']?.toString())) ...[
                       const SizedBox(height: 16),
                       _buildDetailRow(
                         icon: Icons.medical_services,
@@ -1449,12 +1557,17 @@ class _HomePageState extends State<HomePage> {
     bool isDisease = false,
     bool isTreatment = false,
   }) {
+    // Check if plant is healthy
+    final isHealthy = isDisease && _isPlantHealthy(value);
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color:
             isDisease || isTreatment
-                ? (isDisease
+                ? (isHealthy
+                    ? Colors.green.withOpacity(0.1)
+                    : isDisease
                     ? Colors.red.withOpacity(0.1)
                     : Colors.green.withOpacity(0.1))
                 : Colors.grey.withOpacity(0.1),
@@ -1468,17 +1581,23 @@ class _HomePageState extends State<HomePage> {
             decoration: BoxDecoration(
               color:
                   isDisease || isTreatment
-                      ? (isDisease
+                      ? (isHealthy
+                          ? Colors.green.withOpacity(0.2)
+                          : isDisease
                           ? Colors.red.withOpacity(0.2)
                           : Colors.green.withOpacity(0.2))
                       : Colors.grey.withOpacity(0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
-              icon,
+              isHealthy ? Icons.check_circle_rounded : icon,
               color:
                   isDisease || isTreatment
-                      ? (isDisease ? Colors.red : Colors.green)
+                      ? (isHealthy
+                          ? Colors.green.shade700
+                          : isDisease
+                          ? Colors.red
+                          : Colors.green)
                       : Colors.grey,
               size: 20,
             ),
@@ -1503,12 +1622,194 @@ class _HomePageState extends State<HomePage> {
                     fontSize: 16,
                     color:
                         isDisease || isTreatment
-                            ? (isDisease ? Colors.red : Colors.green)
+                            ? (isHealthy
+                                ? Colors.green.shade700
+                                : isDisease
+                                ? Colors.red
+                                : Colors.green)
                             : Colors.black87,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFAQsDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.help_outline_rounded,
+                        color: Colors.orange,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Frequently Asked Questions',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildFAQItem(
+                          question: 'How do I scan my plant for diseases?',
+                          answer:
+                              'Tap the camera button at the bottom of the screen, take a photo of your plant\'s leaves or affected area, and wait for the AI to analyze it. The results will show any detected diseases and treatment recommendations.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFAQItem(
+                          question:
+                              'What should I do if a disease is detected?',
+                          answer:
+                              'The app will provide specific treatment recommendations based on the detected disease. Follow the treatment plan provided, which may include organic remedies, pruning instructions, or when to consult a professional.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFAQItem(
+                          question: 'How accurate is the disease detection?',
+                          answer:
+                              'Our AI model has been trained on thousands of plant disease images. While it\'s highly accurate, always consider consulting a professional for critical cases or when symptoms persist.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFAQItem(
+                          question: 'Can I track my plant\'s health over time?',
+                          answer:
+                              'Yes! Your scan history is automatically saved. You can view past scans, track disease progression, and monitor treatment effectiveness through the Scan History section.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFAQItem(
+                          question:
+                              'What if my plant shows "No disease detected"?',
+                          answer:
+                              'Great news! Your plant appears healthy. Continue with regular care: proper watering, adequate sunlight, and periodic checks. Use the daily reminder feature to maintain your plant care routine.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFAQItem(
+                          question: 'How can I use the AI Chatbot?',
+                          answer:
+                              'Tap on the AI Chatbot card to access our AI assistant. You can ask questions about plant care, treatment methods, disease prevention, and get tutorials on various plant care topics.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFAQItem(
+                          question: 'Is my plant data secure?',
+                          answer:
+                              'Yes, all your plant scan data is securely stored and associated only with your account. We respect your privacy and use your data solely to improve your plant care experience.',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFAQItem(
+                          question: 'What plants are supported?',
+                          answer:
+                              'CropCure supports a wide variety of common garden plants, vegetables, fruits, and houseplants. The AI is continuously learning to recognize more plant species and diseases.',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        backgroundColor: Colors.orange.withOpacity(0.1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Close',
+                        style: TextStyle(
+                          color: Colors.orange,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFAQItem({required String question, required String answer}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.help_outline, size: 18, color: Colors.orange.shade700),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  question,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 26),
+            child: Text(
+              answer,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+                height: 1.5,
+              ),
             ),
           ),
         ],

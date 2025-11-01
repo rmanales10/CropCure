@@ -7,17 +7,23 @@ class SMSService {
   /// Send OTP to phone number
   static Future<Map<String, dynamic>> sendOTP(String phoneNumber) async {
     try {
+      // Generate OTP code
+      String otpCode = generateOTP();
+
       // Format phone number to Philippine format if needed
       String formattedNumber = _formatPhoneNumber(phoneNumber);
 
+      // Create OTP message with the generated code
+      String otpMessage =
+          'Your CropCure verification code is: $otpCode. Please use it within ${SMSConfig.otpValidityMinutes} minutes.';
+
       final response = await http.post(
-        Uri.parse(SMSConfig.otpEndpoint),
+        Uri.parse(SMSConfig.messagesEndpoint),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: {
           'apikey': SMSConfig.semaphoreApiKey,
           'number': formattedNumber,
-          'message':
-              'Your ${SMSConfig.senderName} verification code is: {otp}. Please use it within ${SMSConfig.otpValidityMinutes} minutes.',
+          'message': otpMessage,
           'sendername': SMSConfig.senderName,
         },
       );
@@ -27,15 +33,10 @@ class SMSService {
         log('SMS API Response: $data'); // Debug logging
         if (data is List && data.isNotEmpty) {
           final responseData = data[0];
-          log(
-            'OTP Code type: ${responseData['code'].runtimeType}',
-          ); // Debug logging
           return {
             'success': true,
             'message_id': responseData['message_id'],
-            'otp_code':
-                responseData['code']?.toString() ??
-                '', // Convert int to string safely
+            'otp_code': otpCode, // Return the generated OTP code
             'status': responseData['status'],
             'message': 'OTP sent successfully',
           };

@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cropcure/user/onboarding_login/auth_screen/signin.dart';
+import 'package:cropcure/services/email_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -53,6 +54,15 @@ class AuthService extends GetxController {
         signupDate,
         'online',
       );
+
+      // Send welcome email (non-blocking - don't fail registration if email fails)
+      EmailService.sendWelcomeEmail(
+        recipientEmail: email,
+        recipientName: fullname,
+      ).catchError((error) {
+        log('Error sending welcome email: $error');
+        return false; // Continue even if email fails
+      });
 
       return 'Registration successful! Your account has been created.';
     } on FirebaseAuthException catch (e) {

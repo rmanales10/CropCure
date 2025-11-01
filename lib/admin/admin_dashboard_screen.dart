@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -22,6 +23,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _selectedNavItem =
       0; // 0 = Dashboard, 1 = Insights, 2 = Trends, 3 = User History
   bool _isSidebarCollapsed = false;
+  int _scanHistoryPage = 0;
+  static const int _scanHistoryItemsPerPage = 5;
+
+  // Helper function to check if a plant is healthy
+  bool _isPlantHealthy(String? disease) {
+    if (disease == null) return false;
+    final diseaseLower = disease.toString().trim().toLowerCase();
+    return diseaseLower == 'no disease detected' ||
+        diseaseLower == 'healthy plant' ||
+        diseaseLower == 'healthy' ||
+        diseaseLower.contains('healthy') ||
+        diseaseLower.contains('no disease');
+  }
 
   // Function to show logout confirmation dialog
   Future<void> _showLogoutDialog() async {
@@ -159,9 +173,215 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     Get.snackbar('Success', 'Logged Out Success!');
   }
 
-  // Generate PDF Report
-  Future<void> _generatePdfReport() async {
+  // Show export options dialog
+  Future<void> _showExportOptionsDialog() async {
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        ReportType? selectedType = ReportType.summary;
+        String? selectedUserId;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.picture_as_pdf_rounded,
+                            color: Colors.green.shade700,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Text(
+                            'Export PDF Report',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1A1A1A),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Select Report Type',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF374151),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...ReportType.values.map((type) {
+                      return RadioListTile<ReportType>(
+                        title: Text(_getReportTypeLabel(type)),
+                        subtitle: Text(_getReportTypeDescription(type)),
+                        value: type,
+                        groupValue: selectedType,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedType = value;
+                            if (value != ReportType.userSpecific) {
+                              selectedUserId = null;
+                            }
+                          });
+                        },
+                        activeColor: Colors.green.shade600,
+                      );
+                    }),
+                    if (selectedType == ReportType.userSpecific) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Select User',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          hint: const Text('Select a user'),
+                          value: selectedUserId,
+                          items:
+                              controller.users.map((user) {
+                                return DropdownMenuItem<String>(
+                                  value: user['uid'],
+                                  child: Text(
+                                    '${user['fullname']} (${user['email']})',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedUserId = value;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () {
+                            if (selectedType == ReportType.userSpecific &&
+                                selectedUserId == null) {
+                              Get.snackbar(
+                                'Error',
+                                'Please select a user',
+                                snackPosition: SnackPosition.TOP,
+                                backgroundColor: Colors.red.shade600,
+                                colorText: Colors.white,
+                              );
+                              return;
+                            }
+                            Navigator.of(context).pop();
+                            _generatePdfReport(selectedType!, selectedUserId);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade600,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                          ),
+                          child: const Text('Export'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _getReportTypeLabel(ReportType type) {
+    switch (type) {
+      case ReportType.summary:
+        return 'Summary Report';
+      case ReportType.detailed:
+        return 'Detailed Report';
+      case ReportType.userSpecific:
+        return 'User-Specific Report';
+      case ReportType.monthly:
+        return 'Monthly Report';
+    }
+  }
+
+  String _getReportTypeDescription(ReportType type) {
+    switch (type) {
+      case ReportType.summary:
+        return 'Quick overview with key statistics';
+      case ReportType.detailed:
+        return 'Complete analytics with full history';
+      case ReportType.userSpecific:
+        return 'Detailed report for selected user';
+      case ReportType.monthly:
+        return 'Monthly trends and comparisons';
+    }
+  }
+
+  // Generate PDF Report with enhanced options
+  Future<void> _generatePdfReport(ReportType reportType, String? userId) async {
     try {
+      // Get admin information
+      Map<String, dynamic>? adminInfo;
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final adminDoc =
+              await FirebaseFirestore.instance
+                  .collection('admins')
+                  .doc(user.uid)
+                  .get();
+          if (adminDoc.exists) {
+            adminInfo = adminDoc.data();
+            adminInfo?['uid'] = user.uid;
+          }
+        }
+      } catch (e) {
+        print('Error fetching admin info: $e');
+      }
+
       final totalScans = controller.history.length;
       final diseaseDetected = controller.totalDiseases;
       final healthyScans = totalScans - diseaseDetected;
@@ -172,6 +392,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         diseaseDetected: diseaseDetected,
         healthyScans: healthyScans,
         diseaseScansPerDay: controller.diseaseScansPerDay,
+        adminInfo: adminInfo,
+        reportType: reportType,
+        userId: userId,
+        usersList: controller.users.toList(),
+        diseaseDistribution: controller.thisMonthDiseaseDistribution,
+        weeklyComparison: controller.weeklyComparison,
       );
 
       Get.snackbar(
@@ -403,7 +629,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   icon: Icons.picture_as_pdf_rounded,
                   label: 'Export PDF',
                   isSelected: false,
-                  onTap: _generatePdfReport,
+                  onTap: _showExportOptionsDialog,
                 ),
               ],
             ),
@@ -579,7 +805,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: _generatePdfReport,
+                  onTap: _showExportOptionsDialog,
                   borderRadius: BorderRadius.circular(10),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -1004,7 +1230,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ),
                               const DataColumn(
                                 label: Text(
-                                  'Disease',
+                                  'Condition',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: Color(0xFF374151),
@@ -1029,12 +1255,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 ) {
                                   final idx = entry.key;
                                   final row = entry.value;
-                                  final isHealthy =
-                                      row['disease']
-                                          ?.toString()
-                                          .trim()
-                                          .toLowerCase() ==
-                                      'no disease detected';
+                                  final isHealthy = _isPlantHealthy(
+                                    row['disease']?.toString(),
+                                  );
 
                                   return DataRow(
                                     color:
@@ -1615,18 +1838,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                     child: SizedBox(
                       height: isSmallScreen ? 180 : 240,
-                      child: LineChart(
-                        LineChartData(
+                      child: BarChart(
+                        BarChartData(
                           gridData: FlGridData(
                             show: true,
-                            drawVerticalLine: true,
+                            drawVerticalLine: false,
+                            horizontalInterval: 5,
                             getDrawingHorizontalLine:
-                                (value) => FlLine(
-                                  color: Colors.grey.shade300,
-                                  strokeWidth: 1,
-                                  dashArray: [5, 5],
-                                ),
-                            getDrawingVerticalLine:
                                 (value) => FlLine(
                                   color: Colors.grey.shade300,
                                   strokeWidth: 1,
@@ -1655,12 +1873,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 getTitlesWidget: (value, meta) {
                                   int idx = value.toInt();
                                   if (idx >= 0 && idx < days.length) {
-                                    return Text(
-                                      days[idx],
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        color: const Color(0xFF6B7280),
-                                        fontSize: isSmallScreen ? 11 : 13,
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 8.0),
+                                      child: Text(
+                                        days[idx],
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: const Color(0xFF6B7280),
+                                          fontSize: isSmallScreen ? 11 : 13,
+                                        ),
                                       ),
                                     );
                                   }
@@ -1683,9 +1904,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               width: 2,
                             ),
                           ),
-                          minX: 0,
-                          maxX: (days.length - 1).toDouble(),
-                          minY: 0,
+                          barGroups: List.generate(
+                            diseaseScans.length,
+                            (index) => BarChartGroupData(
+                              x: index,
+                              barRods: [
+                                BarChartRodData(
+                                  toY: diseaseScans[index].toDouble(),
+                                  color: Colors.green,
+                                  width: isSmallScreen ? 14 : 18,
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(4),
+                                    topRight: Radius.circular(4),
+                                  ),
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.green.shade600,
+                                      Colors.green.shade400,
+                                    ],
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                           maxY:
                               (diseaseScans.isEmpty
                                       ? 1
@@ -1694,63 +1937,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                           ) +
                                           2)
                                   .toDouble(),
-                          lineBarsData: [
-                            LineChartBarData(
-                              spots: List.generate(
-                                diseaseScans.length,
-                                (i) => FlSpot(
-                                  i.toDouble(),
-                                  diseaseScans[i].toDouble(),
-                                ),
-                              ),
-                              isCurved: true,
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.green.shade400,
-                                  Colors.green.shade600,
-                                ],
-                              ),
-                              barWidth: isSmallScreen ? 3 : 4,
-                              dotData: FlDotData(
-                                show: true,
-                                getDotPainter:
-                                    (spot, percent, bar, index) =>
-                                        FlDotCirclePainter(
-                                          radius: isSmallScreen ? 5 : 7,
-                                          color: Colors.white,
-                                          strokeWidth: isSmallScreen ? 2.5 : 3,
-                                          strokeColor: Colors.green.shade600,
-                                        ),
-                              ),
-                              belowBarData: BarAreaData(
-                                show: true,
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.green.shade400.withOpacity(0.25),
-                                    Colors.green.shade400.withOpacity(0.05),
-                                  ],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                ),
-                              ),
-                            ),
-                          ],
-                          lineTouchData: LineTouchData(
+                          barTouchData: BarTouchData(
                             enabled: true,
-                            touchTooltipData: LineTouchTooltipData(
-                              tooltipPadding: const EdgeInsets.all(10),
-                              getTooltipItems: (touchedSpots) {
-                                return touchedSpots.map((spot) {
-                                  return LineTooltipItem(
-                                    'Scans: ${spot.y.toInt()}',
-                                    TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: isSmallScreen ? 13 : 15,
-                                    ),
-                                  );
-                                }).toList();
+                            touchTooltipData: BarTouchTooltipData(
+                              getTooltipItem: (
+                                group,
+                                groupIndex,
+                                rod,
+                                rodIndex,
+                              ) {
+                                return BarTooltipItem(
+                                  'Scans: ${rod.toY.toInt()}',
+                                  TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: isSmallScreen ? 13 : 15,
+                                  ),
+                                );
                               },
+                              tooltipMargin: 8,
+                              tooltipPadding: const EdgeInsets.all(10),
                             ),
                           ),
                         ),
@@ -1869,7 +2075,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ),
                               DataColumn(
                                 label: Text(
-                                  'Disease',
+                                  'Condition',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: const Color(0xFF374151),
@@ -1891,7 +2097,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ),
                             ],
                             rows:
-                                controller.history.asMap().entries.map((entry) {
+                                _getPaginatedScanHistory(
+                                  isSmallScreen,
+                                ).asMap().entries.map((entry) {
                                   final idx = entry.key;
                                   final row = entry.value;
                                   return DataRow(
@@ -1957,75 +2165,78 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                         ),
                                       ),
                                       DataCell(
-                                        Container(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: isSmallScreen ? 8 : 12,
-                                            vertical: isSmallScreen ? 4 : 6,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                row['disease']
-                                                            ?.toString()
-                                                            .trim()
-                                                            .toLowerCase() ==
-                                                        'no disease detected'
-                                                    ? Colors.green.shade50
-                                                    : Colors.red.shade50,
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                row['disease']
-                                                            ?.toString()
-                                                            .trim()
-                                                            .toLowerCase() ==
-                                                        'no disease detected'
-                                                    ? Icons.check_circle_rounded
-                                                    : Icons.warning_rounded,
-                                                size: isSmallScreen ? 14 : 16,
+                                        Builder(
+                                          builder: (context) {
+                                            final isHealthy = _isPlantHealthy(
+                                              row['disease']?.toString(),
+                                            );
+                                            return Container(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal:
+                                                    isSmallScreen ? 8 : 12,
+                                                vertical: isSmallScreen ? 4 : 6,
+                                              ),
+                                              decoration: BoxDecoration(
                                                 color:
-                                                    row['disease']
-                                                                ?.toString()
-                                                                .trim()
-                                                                .toLowerCase() ==
-                                                            'no disease detected'
-                                                        ? Colors.green.shade700
-                                                        : Colors.red.shade700,
+                                                    isHealthy
+                                                        ? Colors.green.shade50
+                                                        : Colors.red.shade50,
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
                                               ),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                row['disease']?.toString() ??
-                                                    'N/A',
-                                                style: TextStyle(
-                                                  fontSize:
-                                                      isSmallScreen ? 12 : 13,
-                                                  color:
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    isHealthy
+                                                        ? Icons
+                                                            .check_circle_rounded
+                                                        : Icons.warning_rounded,
+                                                    size:
+                                                        isSmallScreen ? 14 : 16,
+                                                    color:
+                                                        isHealthy
+                                                            ? Colors
+                                                                .green
+                                                                .shade700
+                                                            : Colors
+                                                                .red
+                                                                .shade700,
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Flexible(
+                                                    child: Text(
                                                       row['disease']
-                                                                  ?.toString()
-                                                                  .trim()
-                                                                  .toLowerCase() ==
-                                                              'no disease detected'
-                                                          ? Colors
-                                                              .green
-                                                              .shade700
-                                                          : Colors.red.shade700,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
+                                                              ?.toString() ??
+                                                          'N/A',
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            isSmallScreen
+                                                                ? 12
+                                                                : 13,
+                                                        color:
+                                                            isHealthy
+                                                                ? Colors
+                                                                    .green
+                                                                    .shade700
+                                                                : Colors
+                                                                    .red
+                                                                    .shade700,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                            ],
-                                          ),
+                                            );
+                                          },
                                         ),
                                       ),
                                       DataCell(
-                                        row['disease']
-                                                    ?.toString()
-                                                    .trim()
-                                                    .toLowerCase() ==
-                                                'no disease detected'
+                                        _isPlantHealthy(
+                                              row['disease']?.toString(),
+                                            )
                                             ? Row(
                                               children: [
                                                 Icon(
@@ -2108,11 +2319,241 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                   );
                 }),
+                // Pagination Controls
+                Obx(() {
+                  if (controller.history.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return _buildScanHistoryPaginationControls(isSmallScreen);
+                }),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  List<Map<String, dynamic>> _getPaginatedScanHistory(bool isSmallScreen) {
+    final history = controller.history;
+    final startIndex = _scanHistoryPage * _scanHistoryItemsPerPage;
+    final endIndex = (startIndex + _scanHistoryItemsPerPage).clamp(
+      0,
+      history.length,
+    );
+    return history.sublist(startIndex.clamp(0, history.length), endIndex);
+  }
+
+  int _getTotalScanHistoryPages() {
+    final totalItems = controller.history.length;
+    if (totalItems == 0) return 1;
+    return (totalItems / _scanHistoryItemsPerPage).ceil();
+  }
+
+  Widget _buildScanHistoryPaginationControls(bool isSmallScreen) {
+    final totalPages = _getTotalScanHistoryPages();
+    final totalItems = controller.history.length;
+    final startItem =
+        totalItems == 0 ? 0 : (_scanHistoryPage * _scanHistoryItemsPerPage) + 1;
+    final endItem = ((_scanHistoryPage + 1) * _scanHistoryItemsPerPage).clamp(
+      0,
+      totalItems,
+    );
+
+    // Reset page if out of bounds
+    if (_scanHistoryPage >= totalPages && totalPages > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() {
+          _scanHistoryPage = totalPages - 1;
+        });
+      });
+    }
+
+    return Container(
+      margin: EdgeInsets.only(top: isSmallScreen ? 16 : 20),
+      padding: EdgeInsets.symmetric(
+        vertical: isSmallScreen ? 12 : 14,
+        horizontal: isSmallScreen ? 12 : 16,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade200, width: 1),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Items info
+          Flexible(
+            child: Text(
+              totalItems == 0
+                  ? 'No items'
+                  : 'Showing $startItem-$endItem of $totalItems',
+              style: TextStyle(
+                fontSize: isSmallScreen ? 11 : 12,
+                color: Colors.green.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          SizedBox(width: isSmallScreen ? 8 : 12),
+          // Pagination buttons
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Previous button
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap:
+                      _scanHistoryPage > 0
+                          ? () {
+                            setState(() {
+                              _scanHistoryPage--;
+                            });
+                          }
+                          : null,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 10 : 12,
+                      vertical: isSmallScreen ? 6 : 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          _scanHistoryPage > 0
+                              ? Colors.green.shade600
+                              : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow:
+                          _scanHistoryPage > 0
+                              ? [
+                                BoxShadow(
+                                  color: Colors.green.withOpacity(0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                              : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.chevron_left_rounded,
+                          color:
+                              _scanHistoryPage > 0
+                                  ? Colors.white
+                                  : Colors.grey.shade600,
+                          size: isSmallScreen ? 16 : 18,
+                        ),
+                        SizedBox(width: isSmallScreen ? 3 : 4),
+                        Text(
+                          'Prev',
+                          style: TextStyle(
+                            color:
+                                _scanHistoryPage > 0
+                                    ? Colors.white
+                                    : Colors.grey.shade600,
+                            fontSize: isSmallScreen ? 11 : 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: isSmallScreen ? 6 : 8),
+              // Page indicator
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 10 : 12,
+                  vertical: isSmallScreen ? 6 : 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.shade300, width: 1),
+                ),
+                child: Text(
+                  'Page ${_scanHistoryPage + 1} of ${totalPages}',
+                  style: TextStyle(
+                    fontSize: isSmallScreen ? 11 : 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+              ),
+              SizedBox(width: isSmallScreen ? 6 : 8),
+              // Next button
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap:
+                      _scanHistoryPage < totalPages - 1
+                          ? () {
+                            setState(() {
+                              _scanHistoryPage++;
+                            });
+                          }
+                          : null,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 10 : 12,
+                      vertical: isSmallScreen ? 6 : 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          _scanHistoryPage < totalPages - 1
+                              ? Colors.green.shade600
+                              : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow:
+                          _scanHistoryPage < totalPages - 1
+                              ? [
+                                BoxShadow(
+                                  color: Colors.green.withOpacity(0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                              : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Next',
+                          style: TextStyle(
+                            color:
+                                _scanHistoryPage < totalPages - 1
+                                    ? Colors.white
+                                    : Colors.grey.shade600,
+                            fontSize: isSmallScreen ? 11 : 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: isSmallScreen ? 3 : 4),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color:
+                              _scanHistoryPage < totalPages - 1
+                                  ? Colors.white
+                                  : Colors.grey.shade600,
+                          size: isSmallScreen ? 16 : 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -2230,8 +2671,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       isDisease: true,
                     ),
                     if (plant['disease'] != null &&
-                        plant['disease'].toString().trim().toLowerCase() !=
-                            'no disease detected') ...[
+                        !_isPlantHealthy(plant['disease']?.toString())) ...[
                       const SizedBox(height: 14),
                       _buildDetailRow(
                         icon: Icons.medical_services_rounded,
@@ -2300,6 +2740,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     bool isDisease = false,
     bool isTreatment = false,
   }) {
+    // Check if plant is healthy
+    final isHealthy = isDisease && _isPlantHealthy(value);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -2308,7 +2751,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         border: Border.all(
           color:
               isDisease || isTreatment
-                  ? (isDisease ? Colors.red.shade200 : Colors.green.shade200)
+                  ? (isHealthy
+                      ? Colors.green.shade200
+                      : isDisease
+                      ? Colors.red.shade200
+                      : Colors.green.shade200)
                   : Colors.grey.shade200,
           width: 1,
         ),
@@ -2321,7 +2768,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             decoration: BoxDecoration(
               gradient:
                   isDisease || isTreatment
-                      ? (isDisease
+                      ? (isHealthy
+                          ? LinearGradient(
+                            colors: [
+                              Colors.green.shade400,
+                              Colors.green.shade600,
+                            ],
+                          )
+                          : isDisease
                           ? LinearGradient(
                             colors: [Colors.red.shade400, Colors.red.shade600],
                           )
@@ -2338,7 +2792,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               boxShadow: [
                 BoxShadow(
                   color: (isDisease || isTreatment
-                          ? (isDisease ? Colors.red : Colors.green)
+                          ? (isHealthy
+                              ? Colors.green
+                              : isDisease
+                              ? Colors.red
+                              : Colors.green)
                           : Colors.grey)
                       .withOpacity(0.3),
                   blurRadius: 6,
@@ -2346,7 +2804,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
               ],
             ),
-            child: Icon(icon, color: Colors.white, size: 20),
+            child: Icon(
+              isHealthy ? Icons.check_circle_rounded : icon,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -2369,7 +2831,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     fontSize: 15,
                     color:
                         isDisease || isTreatment
-                            ? (isDisease
+                            ? (isHealthy
+                                ? Colors.green.shade700
+                                : isDisease
                                 ? Colors.red.shade700
                                 : Colors.green.shade700)
                             : const Color(0xFF1F2937),

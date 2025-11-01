@@ -34,6 +34,9 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
   final RxBool _isRecognizing = false.obs;
   final RxBool _isDetectingDisease = false.obs;
   bool _hasPlantDetected = false;
+  bool _hasRecognitionCompleted = false; // Track if recognition has completed
+  bool _isRecognitionInProgress =
+      false; // Track if recognition is currently in progress
   String _currentPlantName = '';
   final RxString _currentDiseaseName = ''.obs; // Made reactive
   bool _hasDiseaseStored = false;
@@ -115,72 +118,120 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
   }
 
   void _startRecognition() {
-    if (_recognitionTimer != null) return;
+    if (_recognitionTimer != null || _isRecognitionInProgress) return;
 
     log('Starting plant recognition...');
 
-    // Set up the periodic timer for every 3 seconds (increased from 2 for better processing)
+    // Start the first recognition attempt immediately
+    _performRecognition();
+
+    // Set up the periodic timer for every 3 seconds (only if recognition is not in progress)
     _recognitionTimer = Timer.periodic(const Duration(seconds: 3), (
       timer,
     ) async {
+      // Wait for current recognition to complete before starting next one
+      if (_isRecognitionInProgress) {
+        log('Previous recognition still in progress, skipping...');
+        return;
+      }
+
       if (_controller == null ||
           !_controller!.value.isInitialized ||
           !_isRecognizing.value ||
           _hasPlantDetected) {
+        timer.cancel();
+        _stopRecognition();
         return;
       }
 
-      try {
-        log('Taking picture for plant recognition...');
-        final XFile file = await _controller!.takePicture();
-        final bytes = await file.readAsBytes();
-        final image = base64Encode(bytes);
-
-        log('Recognizing plant from image...');
-        // Try to recognize the plant and wait for the response
-        await _plantRecognizer.recognizePlant(image);
-
-        // Only update and display if we haven't detected a plant yet
-        if (!_hasPlantDetected && mounted) {
-          final hasPlant = _plantRecognizer.hasPlantDetected.value;
-          final plantName = _plantRecognizer.plantName.value;
-
-          log(
-            'Recognition result - Plant detected: $hasPlant, Name: $plantName',
-          );
-
-          setState(() {
-            _hasPlantDetected = hasPlant;
-            _currentPlantName = plantName;
-            _base64Image = image;
-          });
-
-          // If a plant is detected, stop immediately and start disease detection
-          if (_hasPlantDetected &&
-              _currentPlantName.isNotEmpty &&
-              _currentPlantName.toLowerCase() != "no plant detected" &&
-              _currentPlantName.toLowerCase() != "unknown plant") {
-            log(
-              'Plant detected: $_currentPlantName. Starting disease detection...',
-            );
-            timer.cancel(); // Stop the timer immediately
-            _isRecognizing.value = false;
-            _stopRecognition();
-            await Future.delayed(const Duration(milliseconds: 500));
-            _startDiseaseDetection();
-          }
-        }
-      } catch (e) {
-        log('Error during recognition: $e');
-        // Error logged, no need to show snackbar during continuous recognition
-      }
+      // Perform recognition
+      await _performRecognition();
     });
+  }
+
+  Future<void> _performRecognition() async {
+    // Check if recognition should continue
+    if (_controller == null ||
+        !_controller!.value.isInitialized ||
+        !_isRecognizing.value ||
+        _hasPlantDetected ||
+        _isRecognitionInProgress) {
+      return;
+    }
+
+    // Mark recognition as in progress
+    _isRecognitionInProgress = true;
+
+    try {
+      log('Taking picture for plant recognition...');
+      final XFile file = await _controller!.takePicture();
+      final bytes = await file.readAsBytes();
+      final image = base64Encode(bytes);
+
+      log('Recognizing plant from image...');
+      // Try to recognize the plant and wait for the response
+      await _plantRecognizer.recognizePlant(image);
+
+      // Only update and display if we haven't detected a plant yet
+      if (!_hasPlantDetected && mounted) {
+        final hasPlant = _plantRecognizer.hasPlantDetected.value;
+        final plantName = _plantRecognizer.plantName.value;
+
+        log('Recognition result - Plant detected: $hasPlant, Name: $plantName');
+
+        setState(() {
+          _hasPlantDetected = hasPlant;
+          _currentPlantName = plantName;
+          _base64Image = image;
+          _hasRecognitionCompleted = true; // Mark recognition as completed
+        });
+
+        // If a plant is detected, stop immediately and start disease detection
+        if (_hasPlantDetected &&
+            _currentPlantName.isNotEmpty &&
+            _currentPlantName.toLowerCase() != "no plant detected" &&
+            _currentPlantName.toLowerCase() != "unknown plant") {
+          log(
+            'Plant detected: $_currentPlantName. Starting disease detection...',
+          );
+          _recognitionTimer?.cancel(); // Stop the timer immediately
+          _isRecognizing.value = false;
+          _stopRecognition();
+          await Future.delayed(const Duration(milliseconds: 500));
+          _startDiseaseDetection();
+        } else {
+          // No plant detected - stop recognition after showing the message
+          _recognitionTimer?.cancel();
+          _isRecognizing.value = false;
+          _stopRecognition();
+        }
+      }
+    } catch (e) {
+      log('Error during recognition: $e');
+      // Mark recognition as completed even on error
+      if (mounted && !_hasPlantDetected) {
+        setState(() {
+          _hasRecognitionCompleted = true;
+          _hasPlantDetected = false;
+          _currentPlantName = '';
+        });
+        // Stop recognition on error
+        _recognitionTimer?.cancel();
+        _isRecognizing.value = false;
+        _stopRecognition();
+      }
+      // Error logged, no need to show snackbar during continuous recognition
+    } finally {
+      // Mark recognition as completed (no longer in progress)
+      _isRecognitionInProgress = false;
+    }
   }
 
   void _stopRecognition() {
     _recognitionTimer?.cancel();
     _recognitionTimer = null;
     _isRecognizing.value = false;
+    _isRecognitionInProgress = false; // Reset recognition in progress flag
   }
 
   void _startDiseaseDetection() async {
@@ -247,12 +298,15 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
     _plantRecognizer.hasDiseaseDetected.value = false;
     _isDetectingDisease.value = false;
     _hasDiseaseStored = false;
+    _isRecognitionInProgress = false; // Reset recognition in progress flag
   }
 
   // Add a method to start new detection
   void startNewDetection() {
     setState(() {
       _hasPlantDetected = false;
+      _hasRecognitionCompleted = false; // Reset recognition completion status
+      _isRecognitionInProgress = false; // Reset recognition in progress flag
       _currentPlantName = '';
       _currentDiseaseName.value = '';
       _base64Image = '';
@@ -332,6 +386,25 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold,
                                           ),
+                                        )
+                                        : _hasRecognitionCompleted
+                                        ? Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.cancel,
+                                              color: Colors.red,
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            const Text(
+                                              'No plant detected',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
                                         )
                                         : Row(
                                           children: [
@@ -468,7 +541,9 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                       ),
                     ),
                   ),
-                  if (_hasPlantDetected && _currentDiseaseName.value.isNotEmpty)
+                  if ((_hasPlantDetected &&
+                          _currentDiseaseName.value.isNotEmpty) ||
+                      (_hasRecognitionCompleted && !_hasPlantDetected))
                     Positioned(
                       bottom: 30,
                       left: 40,
@@ -485,6 +560,10 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                                 onTap: () {
                                   setState(() {
                                     _hasPlantDetected = false;
+                                    _hasRecognitionCompleted =
+                                        false; // Reset recognition completion status
+                                    _isRecognitionInProgress =
+                                        false; // Reset recognition in progress flag
                                     _currentPlantName = '';
                                     _currentDiseaseName.value = '';
                                     _base64Image = '';
@@ -534,83 +613,86 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                               ),
                             ),
                           ),
-                          // Get Treatment Button
-                          GestureDetector(
-                            onTapDown: (_) => _animationController.forward(),
-                            onTapUp: (_) => _animationController.reverse(),
-                            onTapCancel: () => _animationController.reverse(),
-                            child: ScaleTransition(
-                              scale: _scaleAnimation,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.green[700]!,
-                                      Colors.greenAccent[400]!,
-                                    ],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(30),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.greenAccent.withOpacity(
-                                        0.3,
-                                      ),
-                                      blurRadius: 12,
-                                      offset: Offset(0, 6),
+                          // Get Treatment Button (only show when plant is detected)
+                          if (_hasPlantDetected &&
+                              _currentDiseaseName.value.isNotEmpty)
+                            GestureDetector(
+                              onTapDown: (_) => _animationController.forward(),
+                              onTapUp: (_) => _animationController.reverse(),
+                              onTapCancel: () => _animationController.reverse(),
+                              child: ScaleTransition(
+                                scale: _scaleAnimation,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.green[700]!,
+                                        Colors.greenAccent[400]!,
+                                      ],
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
                                     ),
-                                  ],
-                                ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
                                     borderRadius: BorderRadius.circular(30),
-                                    onTap: () {
-                                      _getPlantTreatment();
-                                      isclicked.value = !isclicked.value;
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 18,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.greenAccent.withOpacity(
+                                          0.3,
+                                        ),
+                                        blurRadius: 12,
+                                        offset: Offset(0, 6),
                                       ),
-                                      child: Center(
-                                        child: Obx(
-                                          () =>
-                                              isclicked.value
-                                                  ? SizedBox(
-                                                    height: 28,
-                                                    width: 28,
-                                                    child: CircularProgressIndicator(
-                                                      valueColor:
-                                                          AlwaysStoppedAnimation<
-                                                            Color
-                                                          >(Colors.white),
-                                                      strokeWidth: 3,
-                                                    ),
-                                                  )
-                                                  : Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        Icons.healing,
-                                                        color: Colors.white,
-                                                        size: 28,
+                                    ],
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(30),
+                                      onTap: () {
+                                        _getPlantTreatment();
+                                        isclicked.value = !isclicked.value;
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 18,
+                                        ),
+                                        child: Center(
+                                          child: Obx(
+                                            () =>
+                                                isclicked.value
+                                                    ? SizedBox(
+                                                      height: 28,
+                                                      width: 28,
+                                                      child: CircularProgressIndicator(
+                                                        valueColor:
+                                                            AlwaysStoppedAnimation<
+                                                              Color
+                                                            >(Colors.white),
+                                                        strokeWidth: 3,
                                                       ),
-                                                      SizedBox(width: 12),
-                                                      Text(
-                                                        'Get Treatment',
-                                                        style: TextStyle(
-                                                          fontSize: 20,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          letterSpacing: 1.1,
+                                                    )
+                                                    : Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.healing,
                                                           color: Colors.white,
+                                                          size: 28,
                                                         ),
-                                                      ),
-                                                    ],
-                                                  ),
+                                                        SizedBox(width: 12),
+                                                        Text(
+                                                          'Get Treatment',
+                                                          style: TextStyle(
+                                                            fontSize: 20,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            letterSpacing: 1.1,
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -618,7 +700,6 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                                 ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),

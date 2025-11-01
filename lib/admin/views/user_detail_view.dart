@@ -379,7 +379,7 @@ class _UserDetailViewState extends State<UserDetailView> {
                               ),
                               DataColumn(
                                 label: Text(
-                                  'Disease',
+                                  'Condition',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: Color(0xFF374151),
@@ -1044,7 +1044,7 @@ class _UserDetailViewState extends State<UserDetailView> {
                     const SizedBox(height: 14),
                     _buildDetailRow(
                       icon: Icons.warning_rounded,
-                      title: 'Disease',
+                      title: 'Condition',
                       value: plant['disease']?.toString() ?? 'N/A',
                       isDisease: true,
                     ),

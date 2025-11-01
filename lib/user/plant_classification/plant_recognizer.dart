@@ -6,16 +6,25 @@ import 'package:cropcure/config/gemini_config.dart';
 
 class PlantRecognizer extends GetxController {
   // Using Gemini 2.5 Flash-Lite for image recognition (Free tier: 15 RPM, 250,000 TPM, 1,000 RPD)
-  final imageModel = GenerativeModel(
-    model: GeminiConfig.imageModel,
-    apiKey: GeminiConfig.apiKey,
-  );
+  GenerativeModel? _imageModel;
+  GenerativeModel? _textModel;
 
-  // Using Gemini 2.5 Flash-Lite for text processing (Free tier: 15 RPM, 250,000 TPM, 1,000 RPD)
-  final textModel = GenerativeModel(
-    model: GeminiConfig.textModel,
-    apiKey: GeminiConfig.apiKey,
-  );
+  // Lazy initialization of models with API key from Firestore
+  Future<GenerativeModel> get imageModel async {
+    _imageModel ??= GenerativeModel(
+      model: GeminiConfig.imageModel,
+      apiKey: await GeminiConfig.getApiKey(),
+    );
+    return _imageModel!;
+  }
+
+  Future<GenerativeModel> get textModel async {
+    _textModel ??= GenerativeModel(
+      model: GeminiConfig.textModel,
+      apiKey: await GeminiConfig.getApiKey(),
+    );
+    return _textModel!;
+  }
 
   // Rate limiting variables
   DateTime? _lastImageRequest;
@@ -73,7 +82,8 @@ class PlantRecognizer extends GetxController {
       ];
 
       _updateImageRequestTime(); // Update request time before making the call
-      final response = await imageModel.generateContent(content);
+      final model = await imageModel;
+      final response = await model.generateContent(content);
       final detectedName = response.text?.trim() ?? '';
       plantName.value = detectedName;
 
@@ -112,7 +122,8 @@ class PlantRecognizer extends GetxController {
       ];
 
       _updateImageRequestTime(); // Update request time before making the call
-      final response = await imageModel.generateContent(content);
+      final model = await imageModel;
+      final response = await model.generateContent(content);
       final detectedDisease = response.text?.trim() ?? '';
       diseaseName.value = detectedDisease;
 
@@ -151,7 +162,8 @@ class PlantRecognizer extends GetxController {
       }
 
       _updateTextRequestTime(); // Update request time before making the call
-      final response = await textModel.generateContent([Content.text(prompt)]);
+      final model = await textModel;
+      final response = await model.generateContent([Content.text(prompt)]);
       final treatment = response.text?.trim() ?? '';
 
       // Clean up the treatment recommendation

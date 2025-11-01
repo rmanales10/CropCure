@@ -45,10 +45,14 @@ class HomeController extends GetxController {
           .where((plant) => plant['disease'] != 'No disease detected')
           .length;
 
-  // Returns a map: day string (e.g. '2024-05-24') -> count of diseases
-  Map<String, int> get diseaseScansPerDay {
+  // Returns a map: day string (e.g. '26') -> count of diseases for specified month
+  // If month and year are not provided, uses current month
+  Map<String, int> getDiseaseScansPerDay({int? month, int? year}) {
     final Map<String, int> result = {};
     final dateFormat = DateFormat('dd');
+    final now = DateTime.now();
+    final targetMonth = month ?? now.month;
+    final targetYear = year ?? now.year;
 
     for (var plant in history) {
       if (plant['disease'] != 'No disease detected' &&
@@ -61,10 +65,78 @@ class HomeController extends GetxController {
         } else {
           continue;
         }
-        final dayStr = dateFormat.format(date);
-        result[dayStr] = (result[dayStr] ?? 0) + 1;
+
+        // Filter to only include scans from the specified month and year
+        if (date.month == targetMonth && date.year == targetYear) {
+          final dayStr = dateFormat.format(date);
+          result[dayStr] = (result[dayStr] ?? 0) + 1;
+        }
       }
     }
     return result;
+  }
+
+  // Legacy getter for backward compatibility (uses current month)
+  Map<String, int> get diseaseScansPerDay => getDiseaseScansPerDay();
+
+  // Returns a map: disease name -> count for specified month
+  // Diseases are sorted by count in descending order
+  // Includes all diseases including "Healthy plant"
+  Map<String, int> getTopDiseasesForMonth({
+    required int month,
+    required int year,
+  }) {
+    final Map<String, int> diseaseCounts = {};
+
+    for (var plant in history) {
+      if (plant['disease'] != null &&
+          plant['disease'] != 'No disease detected' &&
+          plant['timestamp'] != null) {
+        DateTime date;
+        if (plant['timestamp'] is Timestamp) {
+          date = (plant['timestamp'] as Timestamp).toDate();
+        } else if (plant['timestamp'] is String) {
+          date = DateTime.parse(plant['timestamp']);
+        } else {
+          continue;
+        }
+
+        // Filter to only include scans from the specified month and year
+        if (date.month == month && date.year == year) {
+          final diseaseName = plant['disease'] as String;
+          diseaseCounts[diseaseName] = (diseaseCounts[diseaseName] ?? 0) + 1;
+        }
+      }
+    }
+
+    // Sort diseases by count in descending order
+    final sortedEntries =
+        diseaseCounts.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+
+    // Return as a map (maintaining order)
+    return Map.fromEntries(sortedEntries);
+  }
+
+  // Get total scan count for a specific month
+  int getTotalScansForMonth({required int month, required int year}) {
+    int count = 0;
+    for (var plant in history) {
+      if (plant['timestamp'] != null) {
+        DateTime date;
+        if (plant['timestamp'] is Timestamp) {
+          date = (plant['timestamp'] as Timestamp).toDate();
+        } else if (plant['timestamp'] is String) {
+          date = DateTime.parse(plant['timestamp']);
+        } else {
+          continue;
+        }
+
+        if (date.month == month && date.year == year) {
+          count++;
+        }
+      }
+    }
+    return count;
   }
 }
