@@ -8,6 +8,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 enum ReportType { summary, detailed, userSpecific, monthly }
 
 class PdfService {
+  // Helper function to check if a plant is healthy (matches controller logic)
+  static bool _isPlantHealthy(String? disease) {
+    if (disease == null) return false;
+    final diseaseLower = disease.toString().trim().toLowerCase();
+    return diseaseLower == 'no disease detected' ||
+        diseaseLower == 'healthy plant' ||
+        diseaseLower == 'healthy' ||
+        diseaseLower.contains('healthy') ||
+        diseaseLower.contains('no disease');
+  }
+
   // Enhanced report generation with admin information
   static Future<void> generateAnalyticsReport({
     required List<Map<String, dynamic>> historyData,
@@ -120,9 +131,7 @@ class PdfService {
           final userDiseaseDetected =
               userScans
                   .where(
-                    (scan) =>
-                        scan['disease']?.toString().trim().toLowerCase() !=
-                        'no disease detected',
+                    (scan) => !_isPlantHealthy(scan['disease']?.toString()),
                   )
                   .length;
           final userHealthy = userTotalScans - userDiseaseDetected;
@@ -888,8 +897,7 @@ class PdfService {
                   : row['timestamp']?.toString() ?? 'N/A';
           final plantName = row['name']?.toString() ?? 'N/A';
           final disease = row['disease']?.toString() ?? 'N/A';
-          final isHealthy =
-              disease.trim().toLowerCase() == 'no disease detected';
+          final isHealthy = _isPlantHealthy(disease);
 
           return pw.TableRow(
             children: [

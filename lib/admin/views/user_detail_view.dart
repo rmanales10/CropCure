@@ -404,12 +404,11 @@ class _UserDetailViewState extends State<UserDetailView> {
                                 ) {
                                   final idx = entry.key;
                                   final row = entry.value;
-                                  final isHealthy =
-                                      row['disease']
-                                          ?.toString()
-                                          .trim()
-                                          .toLowerCase() ==
-                                      'no disease detected';
+                                  // Use controller's isPlantHealthy method to properly detect healthy plants
+                                  final isHealthy = widget.controller
+                                      .isPlantHealthy(
+                                        row['disease']?.toString(),
+                                      );
 
                                   return DataRow(
                                     color:
@@ -1048,9 +1047,11 @@ class _UserDetailViewState extends State<UserDetailView> {
                       value: plant['disease']?.toString() ?? 'N/A',
                       isDisease: true,
                     ),
+                    // Check if plant is not healthy (has a disease) using controller's method
                     if (plant['disease'] != null &&
-                        plant['disease'].toString().trim().toLowerCase() !=
-                            'no disease detected') ...[
+                        !widget.controller.isPlantHealthy(
+                          plant['disease']?.toString(),
+                        )) ...[
                       const SizedBox(height: 14),
                       _buildDetailRow(
                         icon: Icons.medical_services_rounded,

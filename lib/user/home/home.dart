@@ -259,7 +259,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Daily Reminder',
+                        'General Reminder',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.green.shade700,

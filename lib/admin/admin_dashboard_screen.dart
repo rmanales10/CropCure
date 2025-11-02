@@ -26,15 +26,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _scanHistoryPage = 0;
   static const int _scanHistoryItemsPerPage = 5;
 
-  // Helper function to check if a plant is healthy
+  // Helper function to check if a plant is healthy - uses controller's method
   bool _isPlantHealthy(String? disease) {
-    if (disease == null) return false;
-    final diseaseLower = disease.toString().trim().toLowerCase();
-    return diseaseLower == 'no disease detected' ||
-        diseaseLower == 'healthy plant' ||
-        diseaseLower == 'healthy' ||
-        diseaseLower.contains('healthy') ||
-        diseaseLower.contains('no disease');
+    return controller.isPlantHealthy(disease);
   }
 
   // Function to show logout confirmation dialog
@@ -211,7 +205,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         const SizedBox(width: 16),
                         const Expanded(
                           child: Text(
-                            'Export PDF Report',
+                            'Generate Reports',
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
@@ -223,7 +217,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                     const SizedBox(height: 24),
                     const Text(
-                      'Select Report Type',
+                      'Select Reports',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -627,7 +621,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 const Divider(height: 32),
                 _buildNavItem(
                   icon: Icons.picture_as_pdf_rounded,
-                  label: 'Export PDF',
+                  label: 'Generate Reports',
                   isSelected: false,
                   onTap: _showExportOptionsDialog,
                 ),
@@ -783,59 +777,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ),
           const Spacer(),
+
           // PDF Export Button
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.green.shade500, Colors.green.shade700],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.green.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _showExportOptionsDialog,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.picture_as_pdf_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Export PDF',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -1773,7 +1716,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Disease Scans & History",
+                          "All Plant Scans & History",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: isSmallScreen ? 20 : 24,
@@ -1783,7 +1726,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          "Track and analyze disease detection trends",
+                          "Track and analyze all scans including healthy plants",
                           style: TextStyle(
                             fontSize: isSmallScreen ? 12 : 13,
                             color: const Color(0xFF6B7280),
@@ -1825,9 +1768,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     );
                   }
 
-                  final scansMap = controller.diseaseScansPerDay;
+                  // Use allScansPerDay to include healthy plants in the chart
+                  final scansMap = controller.allScansPerDay;
                   final days = scansMap.keys.toList()..sort();
-                  final diseaseScans = days.map((d) => scansMap[d]!).toList();
+                  final allScans = days.map((d) => scansMap[d]!).toList();
 
                   return Container(
                     padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
@@ -1905,12 +1849,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                           ),
                           barGroups: List.generate(
-                            diseaseScans.length,
+                            allScans.length,
                             (index) => BarChartGroupData(
                               x: index,
                               barRods: [
                                 BarChartRodData(
-                                  toY: diseaseScans[index].toDouble(),
+                                  toY: allScans[index].toDouble(),
                                   color: Colors.green,
                                   width: isSmallScreen ? 14 : 18,
                                   borderRadius: const BorderRadius.only(
@@ -1930,9 +1874,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                           ),
                           maxY:
-                              (diseaseScans.isEmpty
+                              (allScans.isEmpty
                                       ? 1
-                                      : diseaseScans.reduce(
+                                      : allScans.reduce(
                                             (a, b) => a > b ? a : b,
                                           ) +
                                           2)
@@ -1946,6 +1890,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 rod,
                                 rodIndex,
                               ) {
+                                // Calculate healthy and diseased for this day
+                                final dayIndex = group.x.toInt();
+                                if (dayIndex >= 0 && dayIndex < days.length) {
+                                  final dayKey = days[dayIndex];
+                                  final totalForDay = rod.toY.toInt();
+                                  final diseaseCount =
+                                      controller.diseaseScansPerDay[dayKey] ??
+                                      0;
+                                  final healthyCount =
+                                      totalForDay - diseaseCount;
+
+                                  return BarTooltipItem(
+                                    'Total: $totalForDay\n(Diseased: $diseaseCount, Healthy: $healthyCount)',
+                                    TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: isSmallScreen ? 12 : 14,
+                                    ),
+                                  );
+                                }
                                 return BarTooltipItem(
                                   'Scans: ${rod.toY.toInt()}',
                                   TextStyle(

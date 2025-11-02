@@ -2,13 +2,9 @@ import 'dart:developer';
 import 'package:get/get.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:cropcure/config/gemini_config.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class DailyReminderController extends GetxController {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  User? get currentUser => _auth.currentUser;
+  // Removed FirebaseFirestore - no longer needed for general reminders
 
   var reminder = 'Loading your daily reminder...'.obs;
   var isLoadingReminder = false.obs;
@@ -37,9 +33,6 @@ class DailyReminderController extends GetxController {
     isLoadingReminder.value = true;
 
     try {
-      // Fetch recent scan history for personalized reminders
-      final recentScans = await _fetchRecentScans();
-
       // Initialize model if needed
       if (_reminderModel == null) {
         final apiKey = await GeminiConfig.getApiKey();
@@ -49,43 +42,34 @@ class DailyReminderController extends GetxController {
         );
       }
 
-      // Create prompt for generating reminder
-      String scanContext = '';
-      if (recentScans.isNotEmpty) {
-        scanContext = 'The user recently scanned these plants: ';
-        final plantNames = recentScans
-            .take(3)
-            .map((scan) => scan['name'] ?? 'a plant')
-            .toList()
-            .join(', ');
-        scanContext += '$plantNames.';
-      }
-
+      // Create general plant care reminder prompt (no scan history)
       final prompt =
-          '''Generate a friendly, encouraging daily plant care reminder. 
+          '''Generate a friendly, encouraging daily general plant care reminder. 
 
 Requirements:
-- Keep it short (1 sentence, maximum 15-20 words)
-- Be specific and actionable (water, check, prune, fertilize, etc.)
+- Keep it short and simple (1 sentence, maximum 15-20 words)
+- Be general and not specific to any particular plant
+- Be actionable (water, check, inspect, care for, etc.)
 - Make it warm and encouraging
 - Don't use markdown formatting (no **, *, #, etc.)
 - Don't use quotes or special characters unnecessarily
-${scanContext.isNotEmpty ? '- You can reference their plants: $scanContext' : ''}
+- Don't reference specific plant names or scan history
 
-Examples of good reminders:
-- "Remember to check your plants for any signs of pests or diseases today."
-- "Give your plants some attention today - check if they need watering."
-- "Take a moment to inspect your plant leaves for any discoloration."
+Examples of good general reminders:
+- "Water your plants today if they need it."
+- "Take a moment to check on your plants today."
+- "Give your plants some care and attention today."
+- "Remember to check your plants for proper watering today."
+- "Spend a few minutes caring for your plants today."
 
-Generate ONE unique, fresh reminder that's different from the examples:''';
+Generate ONE unique, fresh general reminder that's different from the examples:''';
 
       final response = await _reminderModel!.generateContent([
         Content.text(prompt),
       ]);
 
       String generatedReminder =
-          response.text?.trim() ??
-          'Take a moment to check on your plants today and give them the care they need.';
+          response.text?.trim() ?? 'Water your plants today if they need it.';
 
       // Clean up any markdown or unwanted characters
       generatedReminder = _cleanReminder(generatedReminder);
@@ -96,13 +80,16 @@ Generate ONE unique, fresh reminder that's different from the examples:''';
       reminder.value = generatedReminder;
     } catch (e) {
       log('Error generating reminder: $e');
-      // Fallback reminders if AI fails
+      // Fallback general reminders if AI fails
       final fallbackReminders = [
-        'Take a moment to check on your plants today and give them the care they need.',
-        'Remember to water your plants if the soil feels dry to the touch.',
-        'Check your plants for any signs of pests, diseases, or nutrient deficiencies.',
-        'Give your plants some attention today - they\'ll thank you for it!',
-        'Make sure your plants are getting adequate sunlight and proper watering.',
+        'Water your plants today if they need it.',
+        'Take a moment to check on your plants today.',
+        'Give your plants some care and attention today.',
+        'Remember to check your plants for proper watering today.',
+        'Spend a few minutes caring for your plants today.',
+        'Check if your plants need water or sunlight today.',
+        'Your plants could use some attention today.',
+        'Make time to care for your plants today.',
       ];
       final randomIndex = DateTime.now().day % fallbackReminders.length;
       _cachedReminder = fallbackReminders[randomIndex];
@@ -113,26 +100,7 @@ Generate ONE unique, fresh reminder that's different from the examples:''';
     }
   }
 
-  Future<List<Map<String, dynamic>>> _fetchRecentScans() async {
-    if (currentUser == null) return [];
-
-    try {
-      final querySnapshot =
-          await _firestore
-              .collection('plants')
-              .where('userId', isEqualTo: currentUser!.uid)
-              .orderBy('timestamp', descending: true)
-              .limit(5)
-              .get();
-
-      return querySnapshot.docs.map((doc) {
-        return Map<String, dynamic>.from(doc.data());
-      }).toList();
-    } catch (e) {
-      log('Error fetching recent scans: $e');
-      return [];
-    }
-  }
+  // Removed _fetchRecentScans() - no longer needed for general reminders
 
   String _cleanReminder(String text) {
     // Remove markdown formatting

@@ -44,18 +44,34 @@ class Controller extends GetxController {
     }
   }
 
+  // Helper function to check if a plant is healthy (public for use in views)
+  bool isPlantHealthy(String? disease) {
+    if (disease == null) return false;
+    final diseaseLower = disease.toString().trim().toLowerCase();
+    return diseaseLower == 'no disease detected' ||
+        diseaseLower == 'healthy plant' ||
+        diseaseLower == 'healthy' ||
+        diseaseLower.contains('healthy') ||
+        diseaseLower.contains('no disease');
+  }
+
   int get totalDiseases =>
       history
-          .where((plant) => plant['disease'] != 'No disease detected')
+          .where((plant) => !isPlantHealthy(plant['disease']?.toString()))
           .length;
 
-  // Returns a map: day string (e.g. '2024-05-24') -> count of diseases
+  // Returns a map: day string (e.g. '24') -> count of diseases
+  // Only includes current month's data for chart consistency
   Map<String, int> get diseaseScansPerDay {
     final Map<String, int> result = {};
     final dateFormat = DateFormat('dd');
+    final now = DateTime.now();
+    final currentMonth = now.month;
+    final currentYear = now.year;
 
     for (var plant in history) {
-      if (plant['disease'] != 'No disease detected' &&
+      // Only count non-healthy plants as diseases
+      if (!isPlantHealthy(plant['disease']?.toString()) &&
           plant['timestamp'] != null) {
         DateTime date;
         if (plant['timestamp'] is Timestamp) {
@@ -65,8 +81,42 @@ class Controller extends GetxController {
         } else {
           continue;
         }
-        final dayStr = dateFormat.format(date);
-        result[dayStr] = (result[dayStr] ?? 0) + 1;
+
+        // Only include current month's scans
+        if (date.month == currentMonth && date.year == currentYear) {
+          final dayStr = dateFormat.format(date);
+          result[dayStr] = (result[dayStr] ?? 0) + 1;
+        }
+      }
+    }
+    return result;
+  }
+
+  // Returns a map: day string -> count of ALL scans (including healthy plants)
+  // Only includes current month's data for chart consistency
+  Map<String, int> get allScansPerDay {
+    final Map<String, int> result = {};
+    final dateFormat = DateFormat('dd');
+    final now = DateTime.now();
+    final currentMonth = now.month;
+    final currentYear = now.year;
+
+    for (var plant in history) {
+      if (plant['timestamp'] != null) {
+        DateTime date;
+        if (plant['timestamp'] is Timestamp) {
+          date = (plant['timestamp'] as Timestamp).toDate();
+        } else if (plant['timestamp'] is String) {
+          date = DateTime.parse(plant['timestamp']);
+        } else {
+          continue;
+        }
+
+        // Only include current month's scans
+        if (date.month == currentMonth && date.year == currentYear) {
+          final dayStr = dateFormat.format(date);
+          result[dayStr] = (result[dayStr] ?? 0) + 1;
+        }
       }
     }
     return result;
@@ -97,11 +147,7 @@ class Controller extends GetxController {
   int get thisMonthTotalScans => thisMonthData.length;
   int get thisMonthDiseases =>
       thisMonthData
-          .where(
-            (plant) =>
-                plant['disease']?.toString().trim().toLowerCase() !=
-                'no disease detected',
-          )
+          .where((plant) => !isPlantHealthy(plant['disease']?.toString()))
           .length;
   int get thisMonthHealthy => thisMonthTotalScans - thisMonthDiseases;
 
@@ -110,7 +156,7 @@ class Controller extends GetxController {
     final Map<String, int> result = {};
     for (var plant in thisMonthData) {
       final disease = plant['disease']?.toString() ?? 'Unknown';
-      if (disease.trim().toLowerCase() != 'no disease detected') {
+      if (!isPlantHealthy(disease)) {
         result[disease] = (result[disease] ?? 0) + 1;
       }
     }
@@ -216,19 +262,11 @@ class Controller extends GetxController {
           'totalScans': userScans.length,
           'diseaseDetected':
               userScans
-                  .where(
-                    (p) =>
-                        p['disease']?.toString().trim().toLowerCase() !=
-                        'no disease detected',
-                  )
+                  .where((p) => !isPlantHealthy(p['disease']?.toString()))
                   .length,
           'healthyScans':
               userScans
-                  .where(
-                    (p) =>
-                        p['disease']?.toString().trim().toLowerCase() ==
-                        'no disease detected',
-                  )
+                  .where((p) => isPlantHealthy(p['disease']?.toString()))
                   .length,
         });
       }
@@ -292,7 +330,7 @@ class Controller extends GetxController {
 
     for (var plant in userScans) {
       final disease = plant['disease']?.toString() ?? 'Unknown';
-      if (disease.trim().toLowerCase() != 'no disease detected') {
+      if (!isPlantHealthy(disease)) {
         result[disease] = (result[disease] ?? 0) + 1;
       }
     }
