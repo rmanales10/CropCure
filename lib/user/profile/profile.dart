@@ -333,19 +333,13 @@ class _ProfilePageState extends State<ProfilePage> {
       );
 
       if (pickedFile != null) {
+        String? imageBase64;
+
         // Check if the platform is Web
         if (kIsWeb) {
           // Web: Use 'readAsBytes' to process the picked image
           final Uint8List webImageBytes = await pickedFile.readAsBytes();
-
-          if (mounted) {
-            setState(() {
-              base64Image = base64Encode(
-                webImageBytes,
-              ); // Store base64 image if needed
-            });
-          }
-
+          imageBase64 = base64Encode(webImageBytes);
           log("Image selected on Web: ${webImageBytes.lengthInBytes} bytes");
         } else {
           // Native (Android/iOS): Use File to get image bytes
@@ -355,17 +349,27 @@ class _ProfilePageState extends State<ProfilePage> {
           if (await nativeImageFile.exists()) {
             final Uint8List nativeImageBytes =
                 await nativeImageFile.readAsBytes();
-
-            if (mounted) {
-              setState(() {
-                base64Image = base64Encode(nativeImageBytes);
-              });
-            }
-            await _controller.storeImage(base64Image!);
+            imageBase64 = base64Encode(nativeImageBytes);
             log("Image selected on Native: ${nativeImageFile.path}");
           } else {
             log("File does not exist: ${pickedFile.path}");
+            return;
           }
+        }
+
+        // Store image in both local state and Firestore
+        if (imageBase64 != null) {
+          if (mounted) {
+            setState(() {
+              base64Image = imageBase64;
+            });
+          }
+
+          // Save to Firestore and update UI
+          await _controller.storeImage(imageBase64);
+
+          // Optionally refresh user info from Firestore to ensure consistency
+          await _controller.fetchUserInfo();
         }
       } else {
         log("No image selected.");

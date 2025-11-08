@@ -119,6 +119,42 @@ class AuthService extends GetxController {
     return user != null; // SMS verification is handled during registration
   }
 
+  // Helper function to format error messages to be shorter and user-friendly
+  String _formatAuthError(String? errorMessage) {
+    if (errorMessage == null) {
+      return 'Invalid credentials. Please try again.';
+    }
+
+    final message = errorMessage.toLowerCase();
+
+    // Check for common Firebase auth error messages and replace with shorter ones
+    if (message.contains('supplied auth credential') ||
+        message.contains('incorrect') ||
+        message.contains('wrong-password') ||
+        message.contains('invalid-credential')) {
+      return 'Invalid email or password.';
+    } else if (message.contains('user-not-found')) {
+      return 'No account found with this email.';
+    } else if (message.contains('too-many-requests')) {
+      return 'Too many attempts. Please try again later.';
+    } else if (message.contains('network')) {
+      return 'Network error. Please check your connection.';
+    } else if (message.contains('invalid-email')) {
+      return 'Invalid email format.';
+    } else if (message.contains('user-disabled')) {
+      return 'This account has been disabled.';
+    } else if (message.contains('expired')) {
+      return 'Session expired. Please try again.';
+    }
+
+    // For other errors, try to keep it short (max 50 characters)
+    if (errorMessage.length > 50) {
+      return 'Login failed. Please check your credentials.';
+    }
+
+    return errorMessage;
+  }
+
   // Sign-in method with email and password
   Future<String> signInWithEmailPassword(String email, String password) async {
     try {
@@ -157,7 +193,7 @@ class AuthService extends GetxController {
         return 'No user found.';
       }
     } on FirebaseAuthException catch (e) {
-      return e.message ?? 'An error occurred during sign-in.';
+      return _formatAuthError(e.message);
     }
   }
 

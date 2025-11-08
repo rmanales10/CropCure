@@ -41,8 +41,20 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
   final RxString _currentDiseaseName = ''.obs; // Made reactive
   bool _hasDiseaseStored = false;
   String _base64Image = '';
-  RxBool isclicked = false.obs;
+  RxBool isclicked = false.obs; // Loading state for Get Treatment button
+  RxBool isDoneLoading = false.obs; // Loading state for Done button
   final _plantController = Get.put(PlantController());
+
+  // Helper function to check if plant is healthy
+  bool _isPlantHealthy(String disease) {
+    if (disease.isEmpty) return false;
+    final diseaseLower = disease.toLowerCase().trim();
+    return diseaseLower == 'no disease detected' ||
+        diseaseLower == 'healthy plant' ||
+        diseaseLower == 'healthy' ||
+        diseaseLower.contains('healthy') ||
+        diseaseLower.contains('no disease');
+  }
 
   @override
   void initState() {
@@ -470,27 +482,27 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
                                       color:
-                                          _currentDiseaseName.value
-                                                      .toLowerCase() ==
-                                                  'no disease detected'
+                                          _isPlantHealthy(
+                                                _currentDiseaseName.value,
+                                              )
                                               ? Colors.green.withOpacity(0.2)
-                                              : Colors.orange.withOpacity(0.2),
+                                              : Colors.red.withOpacity(0.2),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Row(
                                       children: [
                                         Icon(
-                                          _currentDiseaseName.value
-                                                      .toLowerCase() ==
-                                                  'no disease detected'
+                                          _isPlantHealthy(
+                                                _currentDiseaseName.value,
+                                              )
                                               ? Icons.check_circle
                                               : Icons.warning,
                                           color:
-                                              _currentDiseaseName.value
-                                                          .toLowerCase() ==
-                                                      'no disease detected'
-                                                  ? Colors.green
-                                                  : Colors.orange,
+                                              _isPlantHealthy(
+                                                    _currentDiseaseName.value,
+                                                  )
+                                                  ? Colors.green[700]
+                                                  : Colors.red[700],
                                           size: 24,
                                         ),
                                         const SizedBox(width: 8),
@@ -500,32 +512,26 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                _currentDiseaseName.value
-                                                            .toLowerCase() ==
-                                                        'no disease detected'
-                                                    ? 'Plant is Healthy'
-                                                    : 'Disease Detected',
+                                                'Condition',
                                                 style: TextStyle(
                                                   color:
-                                                      _currentDiseaseName.value
-                                                                  .toLowerCase() ==
-                                                              'no disease detected'
-                                                          ? Colors.green
-                                                          : Colors.orange,
+                                                      _isPlantHealthy(
+                                                            _currentDiseaseName
+                                                                .value,
+                                                          )
+                                                          ? Colors.green[700]
+                                                          : Colors.red[700],
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
-                                              if (_currentDiseaseName.value
-                                                      .toLowerCase() !=
-                                                  'no disease detected')
-                                                Text(
-                                                  _currentDiseaseName.value,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 14,
-                                                  ),
+                                              Text(
+                                                _currentDiseaseName.value,
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14,
                                                 ),
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -613,9 +619,96 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                               ),
                             ),
                           ),
-                          // Get Treatment Button (only show when plant is detected)
+                          // Done Button for healthy plants
                           if (_hasPlantDetected &&
-                              _currentDiseaseName.value.isNotEmpty)
+                              _currentDiseaseName.value.isNotEmpty &&
+                              _isPlantHealthy(_currentDiseaseName.value))
+                            GestureDetector(
+                              onTapDown: (_) => _animationController.forward(),
+                              onTapUp: (_) => _animationController.reverse(),
+                              onTapCancel: () => _animationController.reverse(),
+                              child: ScaleTransition(
+                                scale: _scaleAnimation,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.green[700]!,
+                                        Colors.greenAccent[400]!,
+                                      ],
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(30),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.greenAccent.withOpacity(
+                                          0.3,
+                                        ),
+                                        blurRadius: 12,
+                                        offset: Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(30),
+                                      onTap: () async {
+                                        if (!isDoneLoading.value) {
+                                          isDoneLoading.value = true;
+                                          await _saveHealthyPlantAndNavigate();
+                                          isDoneLoading.value = false;
+                                        }
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 18,
+                                        ),
+                                        child: Center(
+                                          child: Obx(
+                                            () =>
+                                                isDoneLoading.value
+                                                    ? SizedBox(
+                                                      height: 28,
+                                                      width: 28,
+                                                      child: CircularProgressIndicator(
+                                                        valueColor:
+                                                            AlwaysStoppedAnimation<
+                                                              Color
+                                                            >(Colors.white),
+                                                        strokeWidth: 3,
+                                                      ),
+                                                    )
+                                                    : Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        SizedBox(width: 12),
+                                                        Text(
+                                                          'Done',
+                                                          style: TextStyle(
+                                                            fontSize: 20,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            letterSpacing: 1.1,
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Get Treatment Button for diseased plants
+                          if (_hasPlantDetected &&
+                              _currentDiseaseName.value.isNotEmpty &&
+                              !_isPlantHealthy(_currentDiseaseName.value))
                             GestureDetector(
                               onTapDown: (_) => _animationController.forward(),
                               onTapUp: (_) => _animationController.reverse(),
@@ -674,11 +767,6 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                                                       mainAxisSize:
                                                           MainAxisSize.min,
                                                       children: [
-                                                        Icon(
-                                                          Icons.healing,
-                                                          color: Colors.white,
-                                                          size: 28,
-                                                        ),
                                                         SizedBox(width: 12),
                                                         Text(
                                                           'Get Treatment',
@@ -713,206 +801,262 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
     );
   }
 
-  Future<void> _getPlantTreatment() async {
-    await _plantRecognizer.getPlantTreatment(
-      _currentPlantName,
-      _currentDiseaseName.value,
-    );
-    await _plantController.addPlant(
-      _currentPlantName,
-      _currentDiseaseName.value,
-      _plantRecognizer.treatmentRecommendation.value,
-      _base64Image,
-    );
+  Future<void> _saveHealthyPlantAndNavigate() async {
+    try {
+      // Get general care tips for healthy plant
+      await _plantRecognizer.getPlantTreatment(
+        _currentPlantName,
+        _currentDiseaseName.value,
+      );
 
-    if (mounted) {
-      isclicked.value = !isclicked.value;
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return Dialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(25),
-            ),
-            elevation: 8,
-            child: Container(
-              padding: const EdgeInsets.all(25),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header with icon and title
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.green[50],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.medical_services_outlined,
-                          color: Colors.green[700],
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: Text(
-                          'Treatment Plan',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green[800],
+      // Save healthy plant to history
+      await _plantController.addPlant(
+        _currentPlantName,
+        _currentDiseaseName.value,
+        _plantRecognizer.treatmentRecommendation.value,
+        _base64Image,
+      );
+
+      // Refresh home data before navigating
+      try {
+        final homeController = Get.find<HomeController>();
+        await homeController.fetchPlants();
+      } catch (e) {
+        log('HomeController not found, will refresh on navigation: $e');
+      }
+
+      // Navigate to home with bottom navigation
+      if (mounted) {
+        Get.offAll(() => const BottomNavigation());
+      }
+    } catch (e) {
+      log('Error saving healthy plant: $e');
+      // Reset loading state on error
+      if (mounted) {
+        isDoneLoading.value = false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving plant: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _getPlantTreatment() async {
+    try {
+      await _plantRecognizer.getPlantTreatment(
+        _currentPlantName,
+        _currentDiseaseName.value,
+      );
+      await _plantController.addPlant(
+        _currentPlantName,
+        _currentDiseaseName.value,
+        _plantRecognizer.treatmentRecommendation.value,
+        _base64Image,
+      );
+
+      if (mounted) {
+        isclicked.value = !isclicked.value;
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+              elevation: 8,
+              child: Container(
+                padding: const EdgeInsets.all(25),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header with icon and title
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.medical_services_outlined,
+                            color: Colors.green[700],
+                            size: 28,
                           ),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.grey[100],
-                          padding: const EdgeInsets.all(8),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: Text(
+                            'Treatment Plan',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green[800],
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  // Plant and Disease Info
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 15,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.local_florist,
-                              size: 18,
-                              color: Colors.green[700],
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _currentPlantName,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.green[800],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              _currentDiseaseName.value.toLowerCase() ==
-                                      'no disease detected'
-                                  ? Icons.check_circle
-                                  : Icons.warning,
-                              size: 18,
-                              color:
-                                  _currentDiseaseName.value.toLowerCase() ==
-                                          'no disease detected'
-                                      ? Colors.green[700]
-                                      : Colors.orange[700],
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _currentDiseaseName.value,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                  color:
-                                      _currentDiseaseName.value.toLowerCase() ==
-                                              'no disease detected'
-                                          ? Colors.green[800]
-                                          : Colors.orange[800],
-                                ),
-                              ),
-                            ),
-                          ],
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.grey[100],
+                            padding: const EdgeInsets.all(8),
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Treatment Content
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.green[200]!),
-                    ),
-                    constraints: BoxConstraints(
-                      maxHeight: 200, // Adjust as needed for your dialog size
-                    ),
-                    child: SingleChildScrollView(
-                      child: Text(
-                        _plantRecognizer.treatmentRecommendation.value,
-                        style: TextStyle(
-                          fontSize: 15,
-                          height: 1.5,
-                          color: Colors.green[900],
-                        ),
-                        // Remove maxLines and overflow for full display
+                    const SizedBox(height: 20),
+                    // Plant and Disease Info
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.grey[200]!),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.local_florist,
+                                size: 18,
+                                color: Colors.green[700],
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _currentPlantName,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green[800],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                _isPlantHealthy(_currentDiseaseName.value)
+                                    ? Icons.check_circle
+                                    : Icons.warning,
+                                size: 18,
+                                color:
+                                    _isPlantHealthy(_currentDiseaseName.value)
+                                        ? Colors.green[700]
+                                        : Colors.red[700],
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _currentDiseaseName.value,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                    color:
+                                        _isPlantHealthy(
+                                              _currentDiseaseName.value,
+                                            )
+                                            ? Colors.green[800]
+                                            : Colors.red[800],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 25),
-                  // Action Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        // Close dialog first
-                        Navigator.of(context).pop();
-
-                        // Refresh home data before navigating
-                        try {
-                          final homeController = Get.find<HomeController>();
-                          await homeController.fetchPlants();
-                        } catch (e) {
-                          // Controller might not exist yet, that's okay
-                          print(
-                            'HomeController not found, will refresh on navigation: $e',
-                          );
-                        }
-
-                        // Navigate to home with bottom navigation
-                        Get.offAll(() => const BottomNavigation());
-                      },
-                      icon: const Icon(Icons.done),
-                      label: const Text('Done'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green[600],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    const SizedBox(height: 20),
+                    // Treatment Content
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.green[50],
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.green[200]!),
+                      ),
+                      constraints: BoxConstraints(
+                        maxHeight: 200, // Adjust as needed for your dialog size
+                      ),
+                      child: SingleChildScrollView(
+                        child: Text(
+                          _plantRecognizer.treatmentRecommendation.value,
+                          style: TextStyle(
+                            fontSize: 15,
+                            height: 1.5,
+                            color: Colors.green[900],
+                          ),
+                          // Remove maxLines and overflow for full display
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 25),
+                    // Action Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          // Close dialog first
+                          Navigator.of(context).pop();
+
+                          // Refresh home data before navigating
+                          try {
+                            final homeController = Get.find<HomeController>();
+                            await homeController.fetchPlants();
+                          } catch (e) {
+                            // Controller might not exist yet, that's okay
+                            print(
+                              'HomeController not found, will refresh on navigation: $e',
+                            );
+                          }
+
+                          // Navigate to home with bottom navigation
+                          Get.offAll(() => const BottomNavigation());
+                        },
+                        icon: const Icon(Icons.done),
+                        label: const Text('Done'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green[600],
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
-      );
+            );
+          },
+        );
+      }
+    } catch (e) {
+      log('Error getting plant treatment: $e');
+      // Reset loading state on error
+      if (mounted) {
+        isclicked.value = false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error getting treatment: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }

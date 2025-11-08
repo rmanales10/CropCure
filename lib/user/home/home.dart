@@ -259,7 +259,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'General Reminder',
+                        'Daily Reminder',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.green.shade700,
@@ -661,7 +661,7 @@ class _HomePageState extends State<HomePage> {
                           label: Padding(
                             padding: EdgeInsets.symmetric(vertical: 8.0),
                             child: Text(
-                              'Contidtion',
+                              'Condition',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.green,
@@ -743,18 +743,30 @@ class _HomePageState extends State<HomePage> {
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             // Icon for healthy plants
-                                            if (isHealthy)
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.check_circle_rounded,
-                                                    size: 18,
-                                                    color:
-                                                        Colors.green.shade700,
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                ],
-                                              ),
+                                            isHealthy
+                                                ? Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons
+                                                          .check_circle_rounded,
+                                                      size: 18,
+                                                      color:
+                                                          Colors.green.shade700,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                  ],
+                                                )
+                                                : Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.warning,
+                                                      size: 18,
+                                                      color:
+                                                          Colors.red.shade700,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                  ],
+                                                ),
                                             Flexible(
                                               child: Text(
                                                 row['disease']?.toString() ??

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:cropcure/admin/controller.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class UserDetailView extends StatefulWidget {
   final Controller controller;
@@ -139,7 +140,7 @@ class _UserDetailViewState extends State<UserDetailView> {
                     'Diseases Detected',
                     userInfo['diseaseDetected']?.toString() ?? '0',
                     Icons.warning_amber_rounded,
-                    Colors.orange,
+                    Colors.red,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -154,7 +155,7 @@ class _UserDetailViewState extends State<UserDetailView> {
               ],
             ),
             const SizedBox(height: 30),
-            // Disease Distribution
+            // Disease Distribution Chart
             if (diseaseDistribution.isNotEmpty) ...[
               Container(
                 padding: const EdgeInsets.all(24),
@@ -181,7 +182,7 @@ class _UserDetailViewState extends State<UserDetailView> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
-                            Icons.pie_chart_rounded,
+                            Icons.bar_chart_rounded,
                             color: Colors.red.shade700,
                             size: 20,
                           ),
@@ -199,68 +200,209 @@ class _UserDetailViewState extends State<UserDetailView> {
                     ),
                     const SizedBox(height: 20),
                     ...(() {
-                      final sorted =
+                      // Sort diseases by count (descending) and take top ones
+                      final sortedDiseases =
                           diseaseDistribution.entries.toList()
                             ..sort((a, b) => b.value.compareTo(a.value));
-                      return sorted.take(10).map((entry) {
-                        final percentage =
-                            (userInfo['diseaseDetected'] as int) > 0
-                                ? (entry.value /
-                                    (userInfo['diseaseDetected'] as int) *
-                                    100)
-                                : 0.0;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      entry.key,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: Color(0xFF1A1A1A),
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${entry.value} (${percentage.toStringAsFixed(1)}%)',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.red.shade700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: LinearProgressIndicator(
-                                  value:
-                                      (userInfo['diseaseDetected'] as int) > 0
-                                          ? entry.value /
-                                              (userInfo['diseaseDetected']
-                                                  as int)
-                                          : 0,
-                                  backgroundColor: Colors.red.shade100,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.red.shade400,
-                                  ),
-                                  minHeight: 8,
+
+                      // Take top 10 diseases for better visualization
+                      final topDiseases = sortedDiseases.take(10).toList();
+
+                      if (topDiseases.isEmpty) {
+                        return [
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(40.0),
+                              child: Text(
+                                'No diseases detected yet',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        );
-                      }).toList();
+                        ];
+                      }
+
+                      final diseaseNames =
+                          topDiseases.map((e) => e.key).toList();
+                      final diseaseCounts =
+                          topDiseases.map((e) => e.value).toList();
+                      final maxCount =
+                          diseaseCounts.isNotEmpty
+                              ? diseaseCounts.reduce((a, b) => a > b ? a : b)
+                              : 1;
+
+                      return [
+                        Container(
+                          padding: const EdgeInsets.all(16.0),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF9FAFB),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.grey.shade200,
+                              width: 1,
+                            ),
+                          ),
+                          child: SizedBox(
+                            height: 350,
+                            child: BarChart(
+                              BarChartData(
+                                gridData: FlGridData(
+                                  show: true,
+                                  drawVerticalLine: false,
+                                  horizontalInterval:
+                                      maxCount > 10
+                                          ? (maxCount / 10).ceil().toDouble()
+                                          : 1,
+                                  getDrawingHorizontalLine:
+                                      (value) => FlLine(
+                                        color: Colors.grey.shade300,
+                                        strokeWidth: 1,
+                                        dashArray: [5, 5],
+                                      ),
+                                ),
+                                titlesData: FlTitlesData(
+                                  leftTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      reservedSize: 40,
+                                      getTitlesWidget:
+                                          (value, meta) => Text(
+                                            value.toInt().toString(),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF6B7280),
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                    ),
+                                  ),
+                                  bottomTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      reservedSize: 80,
+                                      getTitlesWidget: (value, meta) {
+                                        int idx = value.toInt();
+                                        if (idx >= 0 &&
+                                            idx < diseaseNames.length) {
+                                          // Truncate long disease names for better display
+                                          final name = diseaseNames[idx];
+                                          // Truncate to 15 characters and add ellipsis
+                                          final displayName =
+                                              name.length > 15
+                                                  ? '${name.substring(0, 15)}...'
+                                                  : name;
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 8.0,
+                                            ),
+                                            child: Tooltip(
+                                              message:
+                                                  name, // Show full name on hover
+                                              child: Text(
+                                                displayName,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Color(0xFF6B7280),
+                                                  fontSize: 11,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                        return const SizedBox.shrink();
+                                      },
+                                      interval: 1,
+                                    ),
+                                  ),
+                                  topTitles: AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                  rightTitles: AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                ),
+                                borderData: FlBorderData(
+                                  show: true,
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                    width: 2,
+                                  ),
+                                ),
+                                barGroups: List.generate(
+                                  diseaseCounts.length,
+                                  (index) => BarChartGroupData(
+                                    x: index,
+                                    barRods: [
+                                      BarChartRodData(
+                                        toY: diseaseCounts[index].toDouble(),
+                                        color: Colors.red,
+                                        width: 28,
+                                        borderRadius: const BorderRadius.only(
+                                          topLeft: Radius.circular(4),
+                                          topRight: Radius.circular(4),
+                                        ),
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.red.shade600,
+                                            Colors.red.shade400,
+                                          ],
+                                          begin: Alignment.bottomCenter,
+                                          end: Alignment.topCenter,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                maxY: (maxCount + 1).toDouble(),
+                                barTouchData: BarTouchData(
+                                  enabled: true,
+                                  touchTooltipData: BarTouchTooltipData(
+                                    getTooltipItem: (
+                                      group,
+                                      groupIndex,
+                                      rod,
+                                      rodIndex,
+                                    ) {
+                                      final diseaseIndex = group.x.toInt();
+                                      if (diseaseIndex >= 0 &&
+                                          diseaseIndex < diseaseNames.length) {
+                                        final diseaseName =
+                                            diseaseNames[diseaseIndex];
+                                        final count = rod.toY.toInt();
+
+                                        return BarTooltipItem(
+                                          '$diseaseName\nTotal: $count',
+                                          const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        );
+                                      }
+                                      return BarTooltipItem(
+                                        'Count: ${rod.toY.toInt()}',
+                                        const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
+                                      );
+                                    },
+                                    tooltipMargin: 8,
+                                    tooltipPadding: const EdgeInsets.all(10),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ];
                     })(),
                   ],
                 ),
@@ -883,12 +1025,12 @@ class _UserDetailViewState extends State<UserDetailView> {
                 colors: [
                   color == Colors.blue
                       ? Colors.blue.shade400
-                      : color == Colors.orange
+                      : color == Colors.red
                       ? Colors.orange.shade400
                       : Colors.green.shade400,
                   color == Colors.blue
                       ? Colors.blue.shade600
-                      : color == Colors.orange
+                      : color == Colors.red
                       ? Colors.orange.shade600
                       : Colors.green.shade600,
                 ],

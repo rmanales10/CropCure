@@ -4,10 +4,44 @@ import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
+import 'dart:typed_data';
 
 enum ReportType { summary, detailed, userSpecific, monthly }
 
 class PdfService {
+  // Cache for logo images
+  static Uint8List? _logoImageBytes;
+  static Uint8List? _printLogoImageBytes;
+
+  // Load logo image from assets
+  static Future<Uint8List?> _loadLogoImage() async {
+    if (_logoImageBytes != null) return _logoImageBytes;
+    try {
+      final ByteData logoData = await rootBundle.load('assets/print/logo.png');
+      _logoImageBytes = logoData.buffer.asUint8List();
+      return _logoImageBytes;
+    } catch (e) {
+      print('Error loading logo.png: $e');
+      return null;
+    }
+  }
+
+  // Load print logo image from assets
+  static Future<Uint8List?> _loadPrintLogoImage() async {
+    if (_printLogoImageBytes != null) return _printLogoImageBytes;
+    try {
+      final ByteData logoData = await rootBundle.load(
+        'assets/print/print_logo.jpg',
+      );
+      _printLogoImageBytes = logoData.buffer.asUint8List();
+      return _printLogoImageBytes;
+    } catch (e) {
+      print('Error loading print_logo.jpg: $e');
+      return null;
+    }
+  }
+
   // Helper function to check if a plant is healthy (matches controller logic)
   static bool _isPlantHealthy(String? disease) {
     if (disease == null) return false;
@@ -32,6 +66,8 @@ class PdfService {
     List<Map<String, dynamic>>? usersList,
     Map<String, int>? diseaseDistribution,
     Map<String, dynamic>? weeklyComparison,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
     // Get admin information if not provided
     if (adminInfo == null) {
@@ -42,7 +78,11 @@ class PdfService {
     final now = DateTime.now();
     final dateFormat = DateFormat('MMMM dd, yyyy');
     final timeFormat = DateFormat('hh:mm a');
-    final reportTitle = _getReportTitle(reportType, now);
+    final reportTitle = _getReportTitle(reportType, now, startDate, endDate);
+
+    // Load logo images
+    final logoImage = await _loadLogoImage();
+    final printLogoImage = await _loadPrintLogoImage();
 
     // Generate report based on type
     switch (reportType) {
@@ -58,6 +98,8 @@ class PdfService {
                   timeFormat.format(now),
                   adminInfo,
                   reportTitle,
+                  logoImage: logoImage,
+                  printLogoImage: printLogoImage,
                 ),
                 pw.SizedBox(height: 30),
                 _buildStatisticsSection(
@@ -91,6 +133,8 @@ class PdfService {
                   timeFormat.format(now),
                   adminInfo,
                   reportTitle,
+                  logoImage: logoImage,
+                  printLogoImage: printLogoImage,
                 ),
                 pw.SizedBox(height: 25),
                 _buildStatisticsSection(
@@ -116,65 +160,91 @@ class PdfService {
         );
 
         // Additional pages: History table split into manageable chunks
-        _addHistoryTablePages(pdf, historyData, adminInfo, reportTitle);
+        _addHistoryTablePages(
+          pdf,
+          historyData,
+          adminInfo,
+          reportTitle,
+          usersList: usersList,
+        );
         break;
 
       case ReportType.userSpecific:
-        if (userId != null && usersList != null) {
-          final user = usersList.firstWhere(
-            (u) => u['uid'] == userId,
-            orElse: () => {},
-          );
-          final userScans =
-              historyData.where((scan) => scan['userId'] == userId).toList();
-          final userTotalScans = userScans.length;
-          final userDiseaseDetected =
-              userScans
-                  .where(
-                    (scan) => !_isPlantHealthy(scan['disease']?.toString()),
-                  )
-                  .length;
-          final userHealthy = userTotalScans - userDiseaseDetected;
-
-          // First page: User info and statistics
-          pdf.addPage(
-            pw.MultiPage(
-              pageFormat: PdfPageFormat.a4,
-              margin: const pw.EdgeInsets.all(40),
-              build: (pw.Context context) {
-                return [
-                  _buildEnhancedHeader(
-                    dateFormat.format(now),
-                    timeFormat.format(now),
-                    adminInfo,
-                    reportTitle,
+        // Date Range Report - show filtered data
+        // First page: Date range info and statistics
+        pdf.addPage(
+          pw.MultiPage(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.all(40),
+            build: (pw.Context context) {
+              return [
+                _buildEnhancedHeader(
+                  dateFormat.format(now),
+                  timeFormat.format(now),
+                  adminInfo,
+                  reportTitle,
+                  logoImage: logoImage,
+                  printLogoImage: printLogoImage,
+                ),
+                pw.SizedBox(height: 25),
+                if (startDate != null && endDate != null)
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(16),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: PdfColors.grey300),
+                      borderRadius: pw.BorderRadius.circular(8),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'Report Period',
+                          style: pw.TextStyle(
+                            fontSize: 16,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.SizedBox(height: 8),
+                        pw.Text(
+                          'From: ${dateFormat.format(startDate)}',
+                          style: const pw.TextStyle(fontSize: 12),
+                        ),
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          'To: ${dateFormat.format(endDate)}',
+                          style: const pw.TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
                   ),
-                  pw.SizedBox(height: 25),
-                  _buildUserInfoSection(user),
-                  pw.SizedBox(height: 25),
-                  _buildStatisticsSection(
-                    userTotalScans,
-                    userDiseaseDetected,
-                    userHealthy,
-                  ),
-                ];
-              },
-              footer: (pw.Context context) {
-                return _buildEnhancedFooter(context, adminInfo);
-              },
-            ),
-          );
+                pw.SizedBox(height: 25),
+                _buildStatisticsSection(
+                  totalScans,
+                  diseaseDetected,
+                  healthyScans,
+                ),
+                pw.SizedBox(height: 25),
+                if (diseaseDistribution != null &&
+                    diseaseDistribution.isNotEmpty)
+                  _buildDiseaseDistributionSection(diseaseDistribution),
+              ];
+            },
+            footer: (pw.Context context) {
+              return _buildEnhancedFooter(context, adminInfo);
+            },
+          ),
+        );
 
-          // Additional pages: User's scan history
-          if (userScans.isNotEmpty) {
-            _addHistoryTablePages(
-              pdf,
-              userScans,
-              adminInfo,
-              reportTitle,
-              showUserColumn: false,
-            );
-          }
+        // Additional pages: Filtered scan history
+        if (historyData.isNotEmpty) {
+          _addHistoryTablePages(
+            pdf,
+            historyData,
+            adminInfo,
+            reportTitle,
+            showUserColumn: true,
+            usersList: usersList,
+          );
         }
         break;
 
@@ -190,6 +260,8 @@ class PdfService {
                   timeFormat.format(now),
                   adminInfo,
                   reportTitle,
+                  logoImage: logoImage,
+                  printLogoImage: printLogoImage,
                 ),
                 pw.SizedBox(height: 30),
                 _buildStatisticsSection(
@@ -216,7 +288,14 @@ class PdfService {
     }
 
     // Generate filename based on report type
-    final fileName = _generateFileName(reportType, now, adminInfo, userId);
+    final fileName = _generateFileName(
+      reportType,
+      now,
+      adminInfo,
+      userId,
+      startDate,
+      endDate,
+    );
 
     // Print or save the PDF
     await Printing.layoutPdf(
@@ -267,14 +346,22 @@ class PdfService {
   }
 
   // Get report title based on type
-  static String _getReportTitle(ReportType type, DateTime now) {
+  static String _getReportTitle(
+    ReportType type,
+    DateTime now,
+    DateTime? startDate,
+    DateTime? endDate,
+  ) {
     switch (type) {
       case ReportType.summary:
         return 'Summary Report';
       case ReportType.detailed:
         return 'Detailed Analytics Report';
       case ReportType.userSpecific:
-        return 'User-Specific Report';
+        if (startDate != null && endDate != null) {
+          return 'Date Range Report - ${DateFormat('MMM dd, yyyy').format(startDate)} to ${DateFormat('MMM dd, yyyy').format(endDate)}';
+        }
+        return 'Date Range Report';
       case ReportType.monthly:
         return 'Monthly Report - ${DateFormat('MMMM yyyy').format(now)}';
     }
@@ -286,6 +373,8 @@ class PdfService {
     DateTime now,
     Map<String, dynamic>? adminInfo,
     String? userId,
+    DateTime? startDate,
+    DateTime? endDate,
   ) {
     final dateStr = DateFormat('yyyy-MM-dd').format(now);
     final adminName =
@@ -297,7 +386,12 @@ class PdfService {
       case ReportType.detailed:
         return 'CropCure_Detailed_${adminName}_$dateStr.pdf';
       case ReportType.userSpecific:
-        return 'CropCure_UserReport_${userId ?? 'User'}_$dateStr.pdf';
+        if (startDate != null && endDate != null) {
+          final dateRangeStr =
+              '${DateFormat('MMMdd').format(startDate)}_${DateFormat('MMMdd').format(endDate)}';
+          return 'CropCure_DateRange_${dateRangeStr}_$dateStr.pdf';
+        }
+        return 'CropCure_DateRange_$dateStr.pdf';
       case ReportType.monthly:
         return 'CropCure_Monthly_${DateFormat('MMM-yyyy').format(now)}_$dateStr.pdf';
     }
@@ -308,8 +402,10 @@ class PdfService {
     String date,
     String time,
     Map<String, dynamic>? adminInfo,
-    String reportTitle,
-  ) {
+    String reportTitle, {
+    Uint8List? logoImage,
+    Uint8List? printLogoImage,
+  }) {
     final adminName = adminInfo?['name'] ?? 'Admin';
     final adminRole = adminInfo?['role'] ?? 'Admin';
     final adminEmail = adminInfo?['email'] ?? 'N/A';
@@ -325,50 +421,80 @@ class PdfService {
         children: [
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Expanded(
-                child: pw.Column(
+              pw.Flexible(
+                flex: 3,
+                child: pw.Row(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text(
-                      'CropCure Analytics Report',
-                      style: pw.TextStyle(
-                        fontSize: 28,
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.white,
+                    if (logoImage != null)
+                      pw.Container(
+                        margin: const pw.EdgeInsets.only(right: 16),
+                        child: pw.Image(
+                          pw.MemoryImage(logoImage),
+                          width: 60,
+                          height: 60,
+                        ),
                       ),
-                    ),
-                    pw.SizedBox(height: 8),
-                    pw.Text(
-                      reportTitle,
-                      style: pw.TextStyle(
-                        fontSize: 14,
-                        color: PdfColors.white,
-                        fontStyle: pw.FontStyle.italic,
+                    pw.Flexible(
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            'CropCure Analytics Report',
+                            style: pw.TextStyle(
+                              fontSize: 28,
+                              fontWeight: pw.FontWeight.bold,
+                              color: PdfColors.white,
+                            ),
+                          ),
+                          pw.SizedBox(height: 8),
+                          pw.Text(
+                            reportTitle,
+                            style: pw.TextStyle(
+                              fontSize: 14,
+                              color: PdfColors.white,
+                              fontStyle: pw.FontStyle.italic,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                children: [
-                  pw.Text(
-                    date,
-                    style: pw.TextStyle(
-                      fontSize: 12,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.white,
+              pw.Flexible(
+                flex: 1,
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    if (printLogoImage != null)
+                      pw.Container(
+                        margin: const pw.EdgeInsets.only(bottom: 8),
+                        child: pw.Image(
+                          pw.MemoryImage(printLogoImage),
+                          width: 50,
+                          height: 50,
+                        ),
+                      ),
+                    pw.Text(
+                      date,
+                      style: pw.TextStyle(
+                        fontSize: 12,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                      ),
                     ),
-                  ),
-                  pw.Text(
-                    time,
-                    style: const pw.TextStyle(
-                      fontSize: 12,
-                      color: PdfColors.white,
+                    pw.Text(
+                      time,
+                      style: const pw.TextStyle(
+                        fontSize: 12,
+                        color: PdfColors.white,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -376,33 +502,35 @@ class PdfService {
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(
-                    'Generated By:',
-                    style: pw.TextStyle(
-                      fontSize: 10,
-                      color: PdfColor(0.85, 0.85, 0.85), // Light gray
+              pw.Flexible(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'Generated By:',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        color: PdfColor(0.85, 0.85, 0.85), // Light gray
+                      ),
                     ),
-                  ),
-                  pw.SizedBox(height: 4),
-                  pw.Text(
-                    adminName.toString(),
-                    style: pw.TextStyle(
-                      fontSize: 12,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.white,
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      adminName.toString(),
+                      style: pw.TextStyle(
+                        fontSize: 12,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                      ),
                     ),
-                  ),
-                  pw.Text(
-                    '$adminRole | $adminEmail',
-                    style: pw.TextStyle(
-                      fontSize: 10,
-                      color: PdfColor(0.85, 0.85, 0.85), // Light gray
+                    pw.Text(
+                      '$adminRole | $adminEmail',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        color: PdfColor(0.85, 0.85, 0.85), // Light gray
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -425,11 +553,13 @@ class PdfService {
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(
-            'Generated by $adminName ($adminRole) - CropCure Admin Portal',
-            style: pw.TextStyle(
-              fontSize: 10,
-              color: PdfColor.fromHex('#6B7280'),
+          pw.Flexible(
+            child: pw.Text(
+              'Generated by $adminName ($adminRole) - CropCure Admin Portal',
+              style: pw.TextStyle(
+                fontSize: 10,
+                color: PdfColor.fromHex('#6B7280'),
+              ),
             ),
           ),
           pw.Text(
@@ -467,7 +597,7 @@ class PdfService {
           pw.SizedBox(height: 12),
           pw.Row(
             children: [
-              pw.Expanded(
+              pw.Flexible(
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
@@ -489,7 +619,8 @@ class PdfService {
                   ],
                 ),
               ),
-              pw.Expanded(
+              pw.SizedBox(width: 20),
+              pw.Flexible(
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
@@ -599,15 +730,24 @@ class PdfService {
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
             children: [
-              _buildComparisonCard('Current Week', current.toString()),
-              _buildComparisonCard('Previous Week', previous.toString()),
-              _buildComparisonCard(
-                'Change',
-                '${isIncrease ? '+' : ''}${change.toStringAsFixed(1)}%',
-                color:
-                    isIncrease
-                        ? PdfColor.fromHex('#EF4444')
-                        : PdfColor.fromHex('#10B981'),
+              pw.Flexible(
+                child: _buildComparisonCard('Current Week', current.toString()),
+              ),
+              pw.Flexible(
+                child: _buildComparisonCard(
+                  'Previous Week',
+                  previous.toString(),
+                ),
+              ),
+              pw.Flexible(
+                child: _buildComparisonCard(
+                  'Change',
+                  '${isIncrease ? '+' : ''}${change.toStringAsFixed(1)}%',
+                  color:
+                      isIncrease
+                          ? PdfColor.fromHex('#EF4444')
+                          : PdfColor.fromHex('#10B981'),
+                ),
               ),
             ],
           ),
@@ -682,7 +822,7 @@ class PdfService {
   }
 
   static pw.Widget _buildStatCard(String title, String value, PdfColor color) {
-    return pw.Expanded(
+    return pw.Flexible(
       child: pw.Container(
         padding: const pw.EdgeInsets.all(16),
         margin: const pw.EdgeInsets.symmetric(horizontal: 4),
@@ -808,6 +948,7 @@ class PdfService {
     Map<String, dynamic>? adminInfo,
     String reportTitle, {
     bool showUserColumn = true,
+    List<Map<String, dynamic>>? usersList,
   }) {
     const rowsPerPage = 15; // Reduced from 30 to prevent overflow
     final totalPages = (historyData.length / rowsPerPage).ceil();
@@ -847,7 +988,11 @@ class PdfService {
                   ),
                 ),
               pw.SizedBox(height: 16),
-              _buildTable(pageData, showUserColumn: showUserColumn),
+              _buildTable(
+                pageData,
+                showUserColumn: showUserColumn,
+                usersList: usersList,
+              ),
               if (totalPages > 1 && pageIndex < totalPages - 1)
                 pw.Padding(
                   padding: const pw.EdgeInsets.only(top: 12),
@@ -870,10 +1015,36 @@ class PdfService {
     }
   }
 
+  // Helper function to get user name from userId
+  static String _getUserNameFromId(
+    String? userId,
+    List<Map<String, dynamic>>? usersList,
+  ) {
+    if (userId == null || userId.isEmpty || usersList == null) {
+      return 'N/A';
+    }
+
+    try {
+      final user = usersList.firstWhere(
+        (user) =>
+            (user['uid']?.toString() == userId) ||
+            (user['userId']?.toString() == userId),
+        orElse: () => {},
+      );
+
+      return user['fullname']?.toString() ??
+          user['name']?.toString() ??
+          'Unknown User';
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+
   // Build table widget
   static pw.Widget _buildTable(
     List<Map<String, dynamic>> historyData, {
     bool showUserColumn = true,
+    List<Map<String, dynamic>>? usersList,
   }) {
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColor.fromHex('#E5E7EB'), width: 1),
@@ -898,6 +1069,10 @@ class PdfService {
           final plantName = row['name']?.toString() ?? 'N/A';
           final disease = row['disease']?.toString() ?? 'N/A';
           final isHealthy = _isPlantHealthy(disease);
+          final userId =
+              row['userId']?.toString() ?? row['user_id']?.toString();
+          final userName =
+              showUserColumn ? _getUserNameFromId(userId, usersList) : 'N/A';
 
           return pw.TableRow(
             children: [
@@ -911,8 +1086,7 @@ class PdfService {
                         ? PdfColor.fromHex('#10B981')
                         : PdfColor.fromHex('#EF4444'),
               ),
-              if (showUserColumn)
-                _buildTableCell(row['userId']?.toString() ?? 'N/A'),
+              if (showUserColumn) _buildTableCell(userName),
             ],
           );
         }),
@@ -924,6 +1098,7 @@ class PdfService {
   static pw.Widget _buildHistoryTable(
     List<Map<String, dynamic>> historyData, {
     bool showUserColumn = true,
+    List<Map<String, dynamic>>? usersList,
   }) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -940,6 +1115,7 @@ class PdfService {
         _buildTable(
           historyData.take(15).toList(),
           showUserColumn: showUserColumn,
+          usersList: usersList,
         ),
         if (historyData.length > 15)
           pw.Padding(

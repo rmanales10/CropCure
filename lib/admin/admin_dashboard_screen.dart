@@ -25,10 +25,391 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isSidebarCollapsed = false;
   int _scanHistoryPage = 0;
   static const int _scanHistoryItemsPerPage = 5;
+  DateTime? _startDate;
+  DateTime? _endDate;
 
   // Helper function to check if a plant is healthy - uses controller's method
   bool _isPlantHealthy(String? disease) {
     return controller.isPlantHealthy(disease);
+  }
+
+  // Get filtered history based on date range
+  List<Map<String, dynamic>> _getFilteredHistory() {
+    if (_startDate == null && _endDate == null) {
+      return controller.history;
+    }
+
+    return controller.history.where((plant) {
+      if (plant['timestamp'] == null) return false;
+
+      DateTime date;
+      if (plant['timestamp'] is Timestamp) {
+        date = (plant['timestamp'] as Timestamp).toDate();
+      } else if (plant['timestamp'] is String) {
+        date = DateTime.parse(plant['timestamp']);
+      } else {
+        return false;
+      }
+
+      // Normalize to date only (remove time)
+      date = DateTime(date.year, date.month, date.day);
+
+      bool matches = true;
+      if (_startDate != null) {
+        final start = DateTime(
+          _startDate!.year,
+          _startDate!.month,
+          _startDate!.day,
+        );
+        matches =
+            matches &&
+            (date.isAfter(start.subtract(const Duration(days: 1))) ||
+                date.isAtSameMomentAs(start));
+      }
+      if (_endDate != null) {
+        final end = DateTime(_endDate!.year, _endDate!.month, _endDate!.day);
+        matches =
+            matches &&
+            (date.isBefore(end.add(const Duration(days: 1))) ||
+                date.isAtSameMomentAs(end));
+      }
+
+      return matches;
+    }).toList();
+  }
+
+  // Show date range picker dialog
+  Future<void> _showDateRangePicker() async {
+    final DateTime now = DateTime.now();
+    final DateTime firstDate = now.subtract(const Duration(days: 365));
+    final DateTime lastDate = now.add(const Duration(days: 1));
+
+    DateTime? tempStartDate = _startDate;
+    DateTime? tempEndDate = _endDate;
+
+    final result = await showDialog<DateTimeRange?>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Container(
+                constraints: BoxConstraints(maxWidth: 480, minWidth: 440),
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.date_range_rounded,
+                                color: Colors.green.shade700,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            const Text(
+                              'Filter by Date Range',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.close,
+                            color: Colors.grey.shade600,
+                            size: 24,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 28),
+                    // Start Date
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: tempStartDate ?? now,
+                          firstDate: firstDate,
+                          lastDate: lastDate,
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: ColorScheme.light(
+                                  primary: Colors.green.shade700,
+                                  onPrimary: Colors.white,
+                                  surface: Colors.white,
+                                  onSurface: Colors.black87,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null) {
+                          setModalState(() {
+                            tempStartDate = picked;
+                            if (tempEndDate != null &&
+                                tempEndDate!.isBefore(picked)) {
+                              tempEndDate = null;
+                            }
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 18,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              color: Colors.green.shade700,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Start Date',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    tempStartDate != null
+                                        ? DateFormat(
+                                          'MMM dd, yyyy',
+                                        ).format(tempStartDate!)
+                                        : 'Select start date',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color:
+                                          tempStartDate != null
+                                              ? Colors.black87
+                                              : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: Colors.grey.shade400,
+                              size: 24,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    // End Date
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: tempEndDate ?? (tempStartDate ?? now),
+                          firstDate: tempStartDate ?? firstDate,
+                          lastDate: lastDate,
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: ColorScheme.light(
+                                  primary: Colors.green.shade700,
+                                  onPrimary: Colors.white,
+                                  surface: Colors.white,
+                                  onSurface: Colors.black87,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null) {
+                          setModalState(() {
+                            tempEndDate = picked;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 18,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              color: Colors.green.shade700,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'End Date',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    tempEndDate != null
+                                        ? DateFormat(
+                                          'MMM dd, yyyy',
+                                        ).format(tempEndDate!)
+                                        : 'Select end date',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color:
+                                          tempEndDate != null
+                                              ? Colors.black87
+                                              : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: Colors.grey.shade400,
+                              size: 24,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () {
+                              setModalState(() {
+                                tempStartDate = null;
+                                tempEndDate = null;
+                              });
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: Colors.grey.shade300,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              'Clear',
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).pop(
+                                tempStartDate != null && tempEndDate != null
+                                    ? DateTimeRange(
+                                      start: tempStartDate!,
+                                      end: tempEndDate!,
+                                    )
+                                    : null,
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade700,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                            ),
+                            child: const Text(
+                              'Apply Filter',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() {
+        _startDate = result.start;
+        _endDate = result.end;
+        _scanHistoryPage = 0; // Reset to first page when filter changes
+      });
+    }
   }
 
   // Function to show logout confirmation dialog
@@ -173,7 +554,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       context: context,
       builder: (BuildContext context) {
         ReportType? selectedType = ReportType.summary;
-        String? selectedUserId;
+
+        DateTime? reportStartDate;
+        DateTime? reportEndDate;
 
         return StatefulBuilder(
           builder: (context, setState) {
@@ -235,7 +618,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           setState(() {
                             selectedType = value;
                             if (value != ReportType.userSpecific) {
-                              selectedUserId = null;
+                              reportStartDate = null;
+                              reportEndDate = null;
                             }
                           });
                         },
@@ -245,7 +629,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     if (selectedType == ReportType.userSpecific) ...[
                       const SizedBox(height: 12),
                       const Text(
-                        'Select User',
+                        'Select Date Range',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -253,31 +637,149 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: DropdownButton<String>(
-                          isExpanded: true,
-                          hint: const Text('Select a user'),
-                          value: selectedUserId,
-                          items:
-                              controller.users.map((user) {
-                                return DropdownMenuItem<String>(
-                                  value: user['uid'],
-                                  child: Text(
-                                    '${user['fullname']} (${user['email']})',
-                                    overflow: TextOverflow.ellipsis,
+                      // Start Date
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: reportStartDate ?? DateTime.now(),
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 365),
+                            ),
+                            lastDate: DateTime.now(),
+                            builder: (context, child) {
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  colorScheme: ColorScheme.light(
+                                    primary: Colors.green.shade700,
+                                    onPrimary: Colors.white,
+                                    surface: Colors.white,
+                                    onSurface: Colors.black87,
                                   ),
-                                );
-                              }).toList(),
-                          onChanged: (value) {
+                                ),
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (picked != null) {
                             setState(() {
-                              selectedUserId = value;
+                              reportStartDate = picked;
+                              if (reportEndDate != null &&
+                                  reportEndDate!.isBefore(picked)) {
+                                reportEndDate = null;
+                              }
                             });
-                          },
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.grey.shade50,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                size: 18,
+                                color: Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  reportStartDate != null
+                                      ? DateFormat(
+                                        'MMM dd, yyyy',
+                                      ).format(reportStartDate!)
+                                      : 'Select start date',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color:
+                                        reportStartDate != null
+                                            ? Colors.black87
+                                            : Colors.grey.shade400,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // End Date
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate:
+                                reportEndDate ??
+                                (reportStartDate ?? DateTime.now()),
+                            firstDate:
+                                reportStartDate ??
+                                DateTime.now().subtract(
+                                  const Duration(days: 365),
+                                ),
+                            lastDate: DateTime.now(),
+                            builder: (context, child) {
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  colorScheme: ColorScheme.light(
+                                    primary: Colors.green.shade700,
+                                    onPrimary: Colors.white,
+                                    surface: Colors.white,
+                                    onSurface: Colors.black87,
+                                  ),
+                                ),
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              reportEndDate = picked;
+                            });
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.grey.shade50,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                size: 18,
+                                color: Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  reportEndDate != null
+                                      ? DateFormat(
+                                        'MMM dd, yyyy',
+                                      ).format(reportEndDate!)
+                                      : 'Select end date',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color:
+                                        reportEndDate != null
+                                            ? Colors.black87
+                                            : Colors.grey.shade400,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -293,10 +795,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ElevatedButton(
                           onPressed: () {
                             if (selectedType == ReportType.userSpecific &&
-                                selectedUserId == null) {
+                                (reportStartDate == null ||
+                                    reportEndDate == null)) {
                               Get.snackbar(
                                 'Error',
-                                'Please select a user',
+                                'Please select a date range',
                                 snackPosition: SnackPosition.TOP,
                                 backgroundColor: Colors.red.shade600,
                                 colorText: Colors.white,
@@ -304,7 +807,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               return;
                             }
                             Navigator.of(context).pop();
-                            _generatePdfReport(selectedType!, selectedUserId);
+                            _generatePdfReport(
+                              selectedType!,
+                              null,
+                              reportStartDate,
+                              reportEndDate,
+                            );
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green.shade600,
@@ -335,7 +843,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case ReportType.detailed:
         return 'Detailed Report';
       case ReportType.userSpecific:
-        return 'User-Specific Report';
+        return 'Date Range Report';
       case ReportType.monthly:
         return 'Monthly Report';
     }
@@ -348,14 +856,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case ReportType.detailed:
         return 'Complete analytics with full history';
       case ReportType.userSpecific:
-        return 'Detailed report for selected user';
+        return 'Report filtered by date range';
       case ReportType.monthly:
         return 'Monthly trends and comparisons';
     }
   }
 
   // Generate PDF Report with enhanced options
-  Future<void> _generatePdfReport(ReportType reportType, String? userId) async {
+  Future<void> _generatePdfReport(
+    ReportType reportType,
+    String? userId,
+    DateTime? startDate,
+    DateTime? endDate,
+  ) async {
     try {
       // Get admin information
       Map<String, dynamic>? adminInfo;
@@ -376,12 +889,65 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         print('Error fetching admin info: $e');
       }
 
-      final totalScans = controller.history.length;
-      final diseaseDetected = controller.totalDiseases;
+      // Filter history data by date range if date range report
+      List<Map<String, dynamic>> filteredHistory = controller.history;
+      if (reportType == ReportType.userSpecific &&
+          startDate != null &&
+          endDate != null) {
+        filteredHistory =
+            controller.history.where((plant) {
+              if (plant['timestamp'] == null) return false;
+
+              DateTime date;
+              if (plant['timestamp'] is Timestamp) {
+                date = (plant['timestamp'] as Timestamp).toDate();
+              } else if (plant['timestamp'] is String) {
+                try {
+                  date = DateTime.parse(plant['timestamp']);
+                } catch (e) {
+                  return false;
+                }
+              } else {
+                return false;
+              }
+
+              final start = DateTime(
+                startDate.year,
+                startDate.month,
+                startDate.day,
+              );
+              final end = DateTime(endDate.year, endDate.month, endDate.day);
+
+              return (date.isAfter(start.subtract(const Duration(days: 1))) ||
+                      date.isAtSameMomentAs(start)) &&
+                  (date.isBefore(end.add(const Duration(days: 1))) ||
+                      date.isAtSameMomentAs(end));
+            }).toList();
+      }
+
+      // Calculate statistics based on filtered history
+      final totalScans = filteredHistory.length;
+      final diseaseDetected =
+          filteredHistory
+              .where(
+                (plant) =>
+                    !controller.isPlantHealthy(plant['disease']?.toString()),
+              )
+              .length;
       final healthyScans = totalScans - diseaseDetected;
 
+      // Calculate disease distribution for filtered data
+      Map<String, int> filteredDiseaseDistribution = {};
+      for (var plant in filteredHistory) {
+        final disease = plant['disease']?.toString() ?? 'Unknown';
+        if (!controller.isPlantHealthy(disease)) {
+          filteredDiseaseDistribution[disease] =
+              (filteredDiseaseDistribution[disease] ?? 0) + 1;
+        }
+      }
+
       await PdfService.generateAnalyticsReport(
-        historyData: controller.history,
+        historyData: filteredHistory,
         totalScans: totalScans,
         diseaseDetected: diseaseDetected,
         healthyScans: healthyScans,
@@ -390,8 +956,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         reportType: reportType,
         userId: userId,
         usersList: controller.users.toList(),
-        diseaseDistribution: controller.thisMonthDiseaseDistribution,
+        diseaseDistribution: filteredDiseaseDistribution,
         weeklyComparison: controller.weeklyComparison,
+        startDate: startDate,
+        endDate: endDate,
       );
 
       Get.snackbar(
@@ -600,18 +1168,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   isSelected: _selectedNavItem == 0,
                   onTap: () => setState(() => _selectedNavItem = 0),
                 ),
-                _buildNavItem(
-                  icon: Icons.lightbulb_outline_rounded,
-                  label: 'Insights',
-                  isSelected: _selectedNavItem == 1,
-                  onTap: () => setState(() => _selectedNavItem = 1),
-                ),
-                _buildNavItem(
-                  icon: Icons.show_chart_rounded,
-                  label: 'Trends',
-                  isSelected: _selectedNavItem == 2,
-                  onTap: () => setState(() => _selectedNavItem = 2),
-                ),
+                // _buildNavItem(
+                //   icon: Icons.lightbulb_outline_rounded,
+                //   label: 'Insights',
+                //   isSelected: _selectedNavItem == 1,
+                //   onTap: () => setState(() => _selectedNavItem = 1),
+                // ),
+                // _buildNavItem(
+                //   icon: Icons.show_chart_rounded,
+                //   label: 'Trends',
+                //   isSelected: _selectedNavItem == 2,
+                //   onTap: () => setState(() => _selectedNavItem = 2),
+                // ),
                 _buildNavItem(
                   icon: Icons.people_rounded,
                   label: 'User History',
@@ -806,9 +1374,111 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Date Range Filter
+          _buildDateRangeFilter(),
+          const SizedBox(height: 20),
           _buildStatsCards(),
           const SizedBox(height: 30),
           diseaseScanAndHistoryCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateRangeFilter() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.green.shade400, Colors.green.shade600],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.filter_list_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Date Range Filter',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _startDate != null && _endDate != null
+                      ? '${DateFormat('MMM dd, yyyy').format(_startDate!)} - ${DateFormat('MMM dd, yyyy').format(_endDate!)}'
+                      : 'All time (no filter applied)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color:
+                        _startDate != null && _endDate != null
+                            ? Colors.green.shade700
+                            : Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Filter Button
+          ElevatedButton.icon(
+            onPressed: _showDateRangePicker,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade700,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              elevation: 2,
+            ),
+            icon: const Icon(Icons.date_range_rounded, size: 20),
+            label: const Text(
+              'Select Dates',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ),
+          if (_startDate != null || _endDate != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () {
+                setState(() {
+                  _startDate = null;
+                  _endDate = null;
+                  _scanHistoryPage =
+                      0; // Reset to first page when filter is cleared
+                });
+              },
+              icon: Icon(Icons.clear_rounded, color: Colors.red.shade600),
+              tooltip: 'Clear filter',
+            ),
+          ],
         ],
       ),
     );
@@ -933,7 +1603,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     'Diseases Detected',
                     userInfo['diseaseDetected']?.toString() ?? '0',
                     Icons.warning_amber_rounded,
-                    Colors.orange,
+                    Colors.red,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -1530,8 +2200,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildStatsCards() {
     return Obx(() {
-      final totalScans = controller.history.length;
-      final diseaseDetected = controller.totalDiseases;
+      // Use filtered history based on date range
+      final filteredHistory = _getFilteredHistory();
+      final totalScans = filteredHistory.length;
+      final diseaseDetected =
+          filteredHistory
+              .where(
+                (plant) =>
+                    !controller.isPlantHealthy(plant['disease']?.toString()),
+              )
+              .length;
       final healthyScans = totalScans - diseaseDetected;
 
       return LayoutBuilder(
@@ -1561,7 +2239,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 value: diseaseDetected.toString(),
                 icon: Icons.warning_amber_rounded,
                 gradient: LinearGradient(
-                  colors: [Colors.orange.shade400, Colors.orange.shade600],
+                  colors: [Colors.red.shade400, Colors.red.shade600],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -1716,7 +2394,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "All Plant Scans & History",
+                          "Disease Distribution",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: isSmallScreen ? 20 : 24,
@@ -1726,7 +2404,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          "Track and analyze all scans including healthy plants",
+                          "Total number of each disease detected",
                           style: TextStyle(
                             fontSize: isSmallScreen ? 12 : 13,
                             color: const Color(0xFF6B7280),
@@ -1745,33 +2423,76 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     );
                   }
 
-                  if (controller.history.isEmpty) {
+                  // Get disease distribution from filtered history (based on date range)
+                  final filteredHistory = _getFilteredHistory();
+
+                  if (filteredHistory.isEmpty) {
                     return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.history,
-                            size: isSmallScreen ? 36 : 48,
-                            color: Colors.grey.shade400,
-                          ),
-                          SizedBox(height: isSmallScreen ? 12 : 16),
-                          Text(
-                            'No scan history yet',
-                            style: TextStyle(
-                              fontSize: isSmallScreen ? 14 : 16,
-                              color: Colors.grey.shade600,
+                      child: Padding(
+                        padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.filter_alt_outlined,
+                              size: isSmallScreen ? 36 : 48,
+                              color: Colors.grey.shade400,
                             ),
+                            SizedBox(height: isSmallScreen ? 12 : 16),
+                            Text(
+                              _startDate != null || _endDate != null
+                                  ? 'No data found in the selected date range'
+                                  : 'No scan history yet',
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 14 : 16,
+                                color: Colors.grey.shade600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  final diseaseDistribution = <String, int>{};
+                  for (var plant in filteredHistory) {
+                    final disease = plant['disease']?.toString() ?? 'Unknown';
+                    if (!controller.isPlantHealthy(disease)) {
+                      diseaseDistribution[disease] =
+                          (diseaseDistribution[disease] ?? 0) + 1;
+                    }
+                  }
+
+                  // Sort diseases by count (descending) and take top ones
+                  final sortedDiseases =
+                      diseaseDistribution.entries.toList()
+                        ..sort((a, b) => b.value.compareTo(a.value));
+
+                  // Take top 10 diseases for better visualization
+                  final topDiseases = sortedDiseases.take(10).toList();
+
+                  if (topDiseases.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+                        child: Text(
+                          'No diseases detected yet',
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 14 : 16,
+                            color: Colors.grey.shade600,
                           ),
-                        ],
+                        ),
                       ),
                     );
                   }
 
-                  // Use allScansPerDay to include healthy plants in the chart
-                  final scansMap = controller.allScansPerDay;
-                  final days = scansMap.keys.toList()..sort();
-                  final allScans = days.map((d) => scansMap[d]!).toList();
+                  final diseaseNames = topDiseases.map((e) => e.key).toList();
+                  final diseaseCounts =
+                      topDiseases.map((e) => e.value).toList();
+                  final maxCount =
+                      diseaseCounts.isNotEmpty
+                          ? diseaseCounts.reduce((a, b) => a > b ? a : b)
+                          : 1;
 
                   return Container(
                     padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
@@ -1781,13 +2502,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       border: Border.all(color: Colors.grey.shade200, width: 1),
                     ),
                     child: SizedBox(
-                      height: isSmallScreen ? 180 : 240,
+                      height: isSmallScreen ? 280 : 350,
                       child: BarChart(
                         BarChartData(
                           gridData: FlGridData(
                             show: true,
                             drawVerticalLine: false,
-                            horizontalInterval: 5,
+                            horizontalInterval:
+                                maxCount > 10
+                                    ? (maxCount / 10).ceil().toDouble()
+                                    : 1,
                             getDrawingHorizontalLine:
                                 (value) => FlLine(
                                   color: Colors.grey.shade300,
@@ -1799,14 +2523,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             leftTitles: AxisTitles(
                               sideTitles: SideTitles(
                                 showTitles: true,
-                                reservedSize: isSmallScreen ? 24 : 32,
+                                reservedSize: isSmallScreen ? 30 : 40,
                                 getTitlesWidget:
                                     (value, meta) => Text(
                                       value.toInt().toString(),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w600,
                                         color: const Color(0xFF6B7280),
-                                        fontSize: isSmallScreen ? 11 : 13,
+                                        fontSize: isSmallScreen ? 10 : 12,
                                       ),
                                     ),
                               ),
@@ -1814,24 +2538,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             bottomTitles: AxisTitles(
                               sideTitles: SideTitles(
                                 showTitles: true,
+                                reservedSize: isSmallScreen ? 60 : 80,
                                 getTitlesWidget: (value, meta) {
                                   int idx = value.toInt();
-                                  if (idx >= 0 && idx < days.length) {
+                                  if (idx >= 0 && idx < diseaseNames.length) {
+                                    // Truncate long disease names for better display
+                                    final name = diseaseNames[idx];
+                                    // Truncate to 15 characters and add ellipsis
+                                    final displayName =
+                                        name.length > 15
+                                            ? '${name.substring(0, 15)}...'
+                                            : name;
                                     return Padding(
                                       padding: const EdgeInsets.only(top: 8.0),
-                                      child: Text(
-                                        days[idx],
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          color: const Color(0xFF6B7280),
-                                          fontSize: isSmallScreen ? 11 : 13,
+                                      child: Tooltip(
+                                        message:
+                                            name, // Show full name on hover
+                                        child: Text(
+                                          displayName,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: const Color(0xFF6B7280),
+                                            fontSize: isSmallScreen ? 9 : 11,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     );
                                   }
                                   return const SizedBox.shrink();
                                 },
-                                interval: isSmallScreen ? 2 : 1,
+                                interval: 1,
                               ),
                             ),
                             topTitles: AxisTitles(
@@ -1849,22 +2588,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                           ),
                           barGroups: List.generate(
-                            allScans.length,
+                            diseaseCounts.length,
                             (index) => BarChartGroupData(
                               x: index,
                               barRods: [
                                 BarChartRodData(
-                                  toY: allScans[index].toDouble(),
-                                  color: Colors.green,
-                                  width: isSmallScreen ? 14 : 18,
+                                  toY: diseaseCounts[index].toDouble(),
+                                  color: Colors.red,
+                                  width: isSmallScreen ? 20 : 28,
                                   borderRadius: const BorderRadius.only(
                                     topLeft: Radius.circular(4),
                                     topRight: Radius.circular(4),
                                   ),
                                   gradient: LinearGradient(
                                     colors: [
-                                      Colors.green.shade600,
-                                      Colors.green.shade400,
+                                      Colors.red.shade600,
+                                      Colors.red.shade400,
                                     ],
                                     begin: Alignment.bottomCenter,
                                     end: Alignment.topCenter,
@@ -1873,14 +2612,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ],
                             ),
                           ),
-                          maxY:
-                              (allScans.isEmpty
-                                      ? 1
-                                      : allScans.reduce(
-                                            (a, b) => a > b ? a : b,
-                                          ) +
-                                          2)
-                                  .toDouble(),
+                          maxY: (maxCount + 1).toDouble(),
                           barTouchData: BarTouchData(
                             enabled: true,
                             touchTooltipData: BarTouchTooltipData(
@@ -1890,19 +2622,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 rod,
                                 rodIndex,
                               ) {
-                                // Calculate healthy and diseased for this day
-                                final dayIndex = group.x.toInt();
-                                if (dayIndex >= 0 && dayIndex < days.length) {
-                                  final dayKey = days[dayIndex];
-                                  final totalForDay = rod.toY.toInt();
-                                  final diseaseCount =
-                                      controller.diseaseScansPerDay[dayKey] ??
-                                      0;
-                                  final healthyCount =
-                                      totalForDay - diseaseCount;
+                                final diseaseIndex = group.x.toInt();
+                                if (diseaseIndex >= 0 &&
+                                    diseaseIndex < diseaseNames.length) {
+                                  final diseaseName =
+                                      diseaseNames[diseaseIndex];
+                                  final count = rod.toY.toInt();
 
                                   return BarTooltipItem(
-                                    'Total: $totalForDay\n(Diseased: $diseaseCount, Healthy: $healthyCount)',
+                                    '$diseaseName\nTotal: $count',
                                     TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -1911,7 +2639,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   );
                                 }
                                 return BarTooltipItem(
-                                  'Scans: ${rod.toY.toInt()}',
+                                  'Count: ${rod.toY.toInt()}',
                                   TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -1963,12 +2691,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     );
                   }
 
-                  if (controller.history.isEmpty) {
+                  // Get filtered history based on date range
+                  final filteredHistory = _getFilteredHistory();
+
+                  if (filteredHistory.isEmpty) {
                     return Center(
                       child: Padding(
                         padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
                         child: Text(
-                          'No scan history available',
+                          _startDate != null || _endDate != null
+                              ? 'No scan history found in the selected date range'
+                              : 'No scan history available',
                           style: TextStyle(
                             fontSize: isSmallScreen ? 14 : 16,
                             color: Colors.grey.shade600,
@@ -2017,7 +2750,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             columns: [
                               DataColumn(
                                 label: Text(
-                                  'Timestamp',
+                                  'Date',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: const Color(0xFF374151),
@@ -2089,7 +2822,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                             Text(
                                               row['timestamp'] is Timestamp
                                                   ? DateFormat(
-                                                    'MMM dd, yyyy HH:mm',
+                                                    'MMM dd, yyyy',
                                                   ).format(
                                                     (row['timestamp']
                                                             as Timestamp)
@@ -2285,7 +3018,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 }),
                 // Pagination Controls
                 Obx(() {
-                  if (controller.history.isEmpty) {
+                  final filteredHistory = _getFilteredHistory();
+                  if (filteredHistory.isEmpty) {
                     return const SizedBox.shrink();
                   }
                   return _buildScanHistoryPaginationControls(isSmallScreen);
@@ -2299,7 +3033,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   List<Map<String, dynamic>> _getPaginatedScanHistory(bool isSmallScreen) {
-    final history = controller.history;
+    final history = _getFilteredHistory(); // Use filtered history
     final startIndex = _scanHistoryPage * _scanHistoryItemsPerPage;
     final endIndex = (startIndex + _scanHistoryItemsPerPage).clamp(
       0,
@@ -2309,14 +3043,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   int _getTotalScanHistoryPages() {
-    final totalItems = controller.history.length;
+    final totalItems = _getFilteredHistory().length; // Use filtered history
     if (totalItems == 0) return 1;
     return (totalItems / _scanHistoryItemsPerPage).ceil();
   }
 
   Widget _buildScanHistoryPaginationControls(bool isSmallScreen) {
     final totalPages = _getTotalScanHistoryPages();
-    final totalItems = controller.history.length;
+    final totalItems = _getFilteredHistory().length; // Use filtered history
     final startItem =
         totalItems == 0 ? 0 : (_scanHistoryPage * _scanHistoryItemsPerPage) + 1;
     final endItem = ((_scanHistoryPage + 1) * _scanHistoryItemsPerPage).clamp(
@@ -3135,76 +3869,216 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          // Disease Distribution
+          // Disease Distribution Chart
           if (diseaseDistribution.isNotEmpty)
             _buildInsightCard(
-              icon: Icons.pie_chart_rounded,
+              icon: Icons.bar_chart_rounded,
               title: 'Top Diseases This Month',
               color: Colors.red,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children:
-                    (() {
-                      final sorted =
-                          diseaseDistribution.entries.toList()
-                            ..sort((a, b) => b.value.compareTo(a.value));
-                      return sorted.take(5).map((entry) {
-                        final percentage =
-                            monthDiseases > 0
-                                ? (entry.value / monthDiseases * 100)
-                                : 0.0;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      entry.key,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                        color: Color(0xFF1A1A1A),
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+              child:
+                  (() {
+                    // Sort diseases by count (descending) and take top ones
+                    final sorted =
+                        diseaseDistribution.entries.toList()
+                          ..sort((a, b) => b.value.compareTo(a.value));
+
+                    // Take top 5 diseases for better visualization
+                    final topDiseases = sorted.take(5).toList();
+
+                    if (topDiseases.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Center(
+                          child: Text(
+                            'No diseases detected yet',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    final diseaseNames = topDiseases.map((e) => e.key).toList();
+                    final diseaseCounts =
+                        topDiseases.map((e) => e.value).toList();
+                    final maxCount =
+                        diseaseCounts.isNotEmpty
+                            ? diseaseCounts.reduce((a, b) => a > b ? a : b)
+                            : 1;
+
+                    return Container(
+                      padding: const EdgeInsets.all(16.0),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.grey.shade200,
+                          width: 1,
+                        ),
+                      ),
+                      child: SizedBox(
+                        height: 300,
+                        child: BarChart(
+                          BarChartData(
+                            gridData: FlGridData(
+                              show: true,
+                              drawVerticalLine: false,
+                              horizontalInterval:
+                                  maxCount > 10
+                                      ? (maxCount / 10).ceil().toDouble()
+                                      : 1,
+                              getDrawingHorizontalLine:
+                                  (value) => FlLine(
+                                    color: Colors.grey.shade300,
+                                    strokeWidth: 1,
+                                    dashArray: [5, 5],
                                   ),
-                                  Text(
-                                    '${entry.value} (${percentage.toStringAsFixed(1)}%)',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.red.shade700,
+                            ),
+                            titlesData: FlTitlesData(
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 40,
+                                  getTitlesWidget:
+                                      (value, meta) => Text(
+                                        value.toInt().toString(),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF6B7280),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                ),
+                              ),
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 80,
+                                  getTitlesWidget: (value, meta) {
+                                    int idx = value.toInt();
+                                    if (idx >= 0 && idx < diseaseNames.length) {
+                                      // Truncate long disease names for better display
+                                      final name = diseaseNames[idx];
+                                      // Truncate to 15 characters and add ellipsis
+                                      final displayName =
+                                          name.length > 15
+                                              ? '${name.substring(0, 15)}...'
+                                              : name;
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: 8.0,
+                                        ),
+                                        child: Tooltip(
+                                          message:
+                                              name, // Show full name on hover
+                                          child: Text(
+                                            displayName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF6B7280),
+                                              fontSize: 11,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return const SizedBox.shrink();
+                                  },
+                                  interval: 1,
+                                ),
+                              ),
+                              topTitles: AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              rightTitles: AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                            ),
+                            borderData: FlBorderData(
+                              show: true,
+                              border: Border.all(
+                                color: Colors.grey.shade300,
+                                width: 2,
+                              ),
+                            ),
+                            barGroups: List.generate(
+                              diseaseCounts.length,
+                              (index) => BarChartGroupData(
+                                x: index,
+                                barRods: [
+                                  BarChartRodData(
+                                    toY: diseaseCounts[index].toDouble(),
+                                    color: Colors.red,
+                                    width: 28,
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(4),
+                                      topRight: Radius.circular(4),
+                                    ),
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.red.shade600,
+                                        Colors.red.shade400,
+                                      ],
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: LinearProgressIndicator(
-                                  value:
-                                      monthDiseases > 0
-                                          ? entry.value / monthDiseases
-                                          : 0,
-                                  backgroundColor: Colors.red.shade100,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.red.shade400,
-                                  ),
-                                  minHeight: 6,
-                                ),
+                            ),
+                            maxY: (maxCount + 1).toDouble(),
+                            barTouchData: BarTouchData(
+                              enabled: true,
+                              touchTooltipData: BarTouchTooltipData(
+                                getTooltipItem: (
+                                  group,
+                                  groupIndex,
+                                  rod,
+                                  rodIndex,
+                                ) {
+                                  final diseaseIndex = group.x.toInt();
+                                  if (diseaseIndex >= 0 &&
+                                      diseaseIndex < diseaseNames.length) {
+                                    final diseaseName =
+                                        diseaseNames[diseaseIndex];
+                                    final count = rod.toY.toInt();
+                                    final percentage =
+                                        monthDiseases > 0
+                                            ? (count / monthDiseases * 100)
+                                            : 0.0;
+
+                                    return BarTooltipItem(
+                                      '$diseaseName\nTotal: $count (${percentage.toStringAsFixed(1)}%)',
+                                      const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    );
+                                  }
+                                  return BarTooltipItem(
+                                    'Count: ${rod.toY.toInt()}',
+                                    const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  );
+                                },
+                                tooltipMargin: 8,
+                                tooltipPadding: const EdgeInsets.all(10),
                               ),
-                            ],
+                            ),
                           ),
-                        );
-                      }).toList();
-                    })(),
-              ),
+                        ),
+                      ),
+                    );
+                  })(),
             ),
         ],
       );
@@ -3316,7 +4190,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 _buildInsightItem(
                   Icons.warning_amber_rounded,
                   'Disease detection rate: ${controller.thisMonthTotalScans > 0 ? (controller.thisMonthDiseases / controller.thisMonthTotalScans * 100).toStringAsFixed(1) : 0}%',
-                  Colors.orange,
+                  Colors.red,
                 ),
                 const SizedBox(height: 12),
                 _buildInsightItem(

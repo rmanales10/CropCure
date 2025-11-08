@@ -32,5 +32,8 @@ class ProfileController extends GetxController {
     await _firestore.collection('users').doc(currentUser!.uid).set({
       'base64image': base64image,
     }, SetOptions(merge: true));
+
+    // Update the userInfo observable immediately so UI refreshes
+    userInfo.value = {...userInfo, 'base64image': base64image};
   }
 }
