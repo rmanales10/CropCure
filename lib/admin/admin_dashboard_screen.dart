@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:cropcure/admin/controller.dart';
 import 'package:cropcure/admin/pdf_service.dart';
 import 'package:cropcure/admin/views/user_history_view.dart';
@@ -3294,130 +3296,70 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.green.shade400,
-                                Colors.green.shade600,
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            color: Colors.green.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.green.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
                           ),
                           child: const Icon(
-                            Icons.eco_rounded,
-                            color: Colors.white,
-                            size: 28,
+                            Icons.eco,
+                            color: Colors.green,
+                            size: 24,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Plant Details',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1A1A1A),
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Scan information',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF6B7280),
-                              ),
-                            ),
-                          ],
+                        const SizedBox(width: 12),
+                        Text(
+                          plant['name']?.toString() ?? 'N/A',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
+                    // Plant Image
+                    if (plant['base64Image'] != null &&
+                        plant['base64Image'].toString().trim().isNotEmpty)
+                      _buildPlantImage(plant['base64Image']),
+                    if (plant['base64Image'] != null &&
+                        plant['base64Image'].toString().trim().isNotEmpty)
+                      const SizedBox(height: 16),
                     _buildDetailRow(
-                      icon: Icons.access_time_rounded,
-                      title: 'Date & Time',
-                      value:
-                          plant['timestamp'] is Timestamp
-                              ? DateFormat('MMM dd, yyyy HH:mm').format(
-                                (plant['timestamp'] as Timestamp).toDate(),
-                              )
-                              : plant['timestamp']?.toString() ?? 'N/A',
-                    ),
-                    const SizedBox(height: 14),
-                    _buildDetailRow(
-                      icon: Icons.local_florist_rounded,
-                      title: 'Plant Name',
-                      value: plant['name']?.toString() ?? 'N/A',
-                    ),
-                    const SizedBox(height: 14),
-                    _buildDetailRow(
-                      icon: Icons.warning_rounded,
+                      icon: Icons.bug_report,
                       title: 'Disease',
                       value: plant['disease']?.toString() ?? 'N/A',
                       isDisease: true,
                     ),
                     if (plant['disease'] != null &&
                         !_isPlantHealthy(plant['disease']?.toString())) ...[
-                      const SizedBox(height: 14),
-                      _buildDetailRow(
-                        icon: Icons.medical_services_rounded,
-                        title: 'Treatment',
-                        value:
-                            plant['treatment']?.toString() ??
+                      const SizedBox(height: 16),
+                      _buildTreatmentSection(
+                        plant['treatment']?.toString() ??
                             'No treatment available',
-                        isTreatment: true,
                       ),
                     ],
-                    const SizedBox(height: 28),
-                    SizedBox(
-                      width: double.infinity,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.green.shade400,
-                              Colors.green.shade600,
-                            ],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.green.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                    const SizedBox(height: 24),
+                    // Close Button
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
                         ),
-                        child: TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Close',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        backgroundColor: Colors.green.withOpacity(0.1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Close',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -4296,6 +4238,295 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPlantImage(dynamic base64Image) {
+    try {
+      if (base64Image != null && base64Image.toString().trim().isNotEmpty) {
+        String imageString = base64Image.toString().trim();
+
+        // Remove data URL prefix if present (e.g., "data:image/png;base64,")
+        if (imageString.contains(',')) {
+          imageString = imageString.split(',').last;
+        }
+
+        Uint8List imageBytes = base64Decode(imageString);
+        return Container(
+          width: double.infinity,
+          height: 200,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green.shade200, width: 2),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.memory(
+              imageBytes,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (context, error, stackTrace) {
+                // If image fails to load, show placeholder
+                return Container(
+                  width: double.infinity,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.image_not_supported_rounded,
+                        size: 48,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Image not available',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // If decoding fails, show placeholder
+      debugPrint('Error decoding plant image: $e');
+    }
+
+    // Default placeholder if no image
+    return Container(
+      width: double.infinity,
+      height: 200,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.local_florist_rounded,
+            size: 48,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'No image available',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTreatmentSection(String treatmentText) {
+    // Parse the treatment text to identify sections and bullet points
+    final sections = <Map<String, dynamic>>[];
+    final lines = treatmentText.split('\n');
+
+    String? currentSection;
+    List<String> currentItems = [];
+
+    for (var line in lines) {
+      line = line.trim();
+      if (line.isEmpty) continue;
+
+      // Check if it's a section header (ends with colon and contains keywords)
+      final isSectionHeader =
+          line.endsWith(':') &&
+          (line.toLowerCase().contains('actions') ||
+              line.toLowerCase().contains('measures') ||
+              line.toLowerCase().contains('monitoring') ||
+              line.toLowerCase().contains('preventive') ||
+              line.toLowerCase().contains('immediate'));
+
+      if (isSectionHeader) {
+        // Save previous section if exists
+        if (currentSection != null && currentItems.isNotEmpty) {
+          sections.add({
+            'title': currentSection,
+            'items': List<String>.from(currentItems),
+          });
+        }
+        currentSection = line.replaceAll(':', '').trim();
+        currentItems = [];
+      } else {
+        // Check if it's a bullet point (starts with bullet, dash, or asterisk)
+        final isBullet =
+            line.startsWith('•') ||
+            line.startsWith('-') ||
+            line.startsWith('*') ||
+            (line.length > 0 && RegExp(r'^\s*[•\-\*]').hasMatch(line));
+
+        if (isBullet) {
+          // It's a bullet point - clean it up
+          String item = line.replaceFirst(RegExp(r'^\s*[•\-\*]\s*'), '').trim();
+          if (item.isNotEmpty) {
+            // If no current section, create a default one
+            if (currentSection == null) {
+              currentSection = 'Treatment';
+            }
+            currentItems.add(item);
+          }
+        } else if (currentSection != null) {
+          // Regular text line in a section
+          currentItems.add(line);
+        } else {
+          // If no section yet, treat as general text
+          if (currentSection == null) {
+            currentSection = 'Treatment';
+          }
+          currentItems.add(line);
+        }
+      }
+    }
+
+    // Add the last section
+    if (currentSection != null && currentItems.isNotEmpty) {
+      sections.add({
+        'title': currentSection,
+        'items': List<String>.from(currentItems),
+      });
+    }
+
+    // If no sections found, treat entire text as single section
+    if (sections.isEmpty) {
+      sections.add({
+        'title': 'Treatment',
+        'items': [treatmentText],
+      });
+    }
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 400),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.withOpacity(0.3), width: 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Treatment Header
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.medical_services,
+                    color: Colors.green,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Treatment',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Treatment Content (Scrollable)
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ...sections.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final section = entry.value;
+                    final sectionTitle = section['title'] as String;
+                    final items = section['items'] as List<String>;
+
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        bottom: index < sections.length - 1 ? 16 : 0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Section Title
+                          if (sectionTitle != 'Treatment')
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                sectionTitle,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                          // Section Items
+                          ...items.map((item) {
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                left: 4,
+                                bottom: 8,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 7, right: 10),
+                                    child: Icon(
+                                      Icons.circle,
+                                      size: 6,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      item,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.green,
+                                        height: 1.6,
+                                        letterSpacing: 0.2,
+                                      ),
+                                      textAlign: TextAlign.left,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

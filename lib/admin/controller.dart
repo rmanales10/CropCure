@@ -259,6 +259,7 @@ class Controller extends GetxController {
           'phone_number': userData['phone_number'] ?? 'N/A',
           'created_at': userData['created_at'],
           'status': userData['status'] ?? 'offline',
+          'base64image': userData['base64image'], // Include profile image
           'totalScans': userScans.length,
           'diseaseDetected':
               userScans

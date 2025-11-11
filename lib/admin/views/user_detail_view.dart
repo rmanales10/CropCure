@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -80,22 +82,7 @@ class _UserDetailViewState extends State<UserDetailView> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue.shade400, Colors.blue.shade600],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.person_rounded,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
+                _buildProfileImage(userInfo),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -235,172 +222,218 @@ class _UserDetailViewState extends State<UserDetailView> {
                               : 1;
 
                       return [
-                        Container(
-                          padding: const EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF9FAFB),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.grey.shade200,
-                              width: 1,
-                            ),
-                          ),
-                          child: SizedBox(
-                            height: 350,
-                            child: BarChart(
-                              BarChartData(
-                                gridData: FlGridData(
-                                  show: true,
-                                  drawVerticalLine: false,
-                                  horizontalInterval:
-                                      maxCount > 10
-                                          ? (maxCount / 10).ceil().toDouble()
-                                          : 1,
-                                  getDrawingHorizontalLine:
-                                      (value) => FlLine(
-                                        color: Colors.grey.shade300,
-                                        strokeWidth: 1,
-                                        dashArray: [5, 5],
-                                      ),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isSmallScreen = constraints.maxWidth < 900;
+                            final screenWidth = constraints.maxWidth;
+
+                            return Container(
+                              padding: const EdgeInsets.all(16.0),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF9FAFB),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.grey.shade200,
+                                  width: 1,
                                 ),
-                                titlesData: FlTitlesData(
-                                  leftTitles: AxisTitles(
-                                    sideTitles: SideTitles(
-                                      showTitles: true,
-                                      reservedSize: 40,
-                                      getTitlesWidget:
-                                          (value, meta) => Text(
-                                            value.toInt().toString(),
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF6B7280),
-                                              fontSize: 12,
+                              ),
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minWidth:
+                                      isSmallScreen
+                                          ? screenWidth - 48
+                                          : screenWidth - 100,
+                                ),
+                                child: SizedBox(
+                                  height: isSmallScreen ? 280 : 350,
+                                  child: BarChart(
+                                    BarChartData(
+                                      gridData: FlGridData(
+                                        show: true,
+                                        drawVerticalLine: false,
+                                        horizontalInterval:
+                                            maxCount > 10
+                                                ? (maxCount / 10)
+                                                    .ceil()
+                                                    .toDouble()
+                                                : 1,
+                                        getDrawingHorizontalLine:
+                                            (value) => FlLine(
+                                              color: Colors.grey.shade300,
+                                              strokeWidth: 1,
+                                              dashArray: [5, 5],
                                             ),
-                                          ),
-                                    ),
-                                  ),
-                                  bottomTitles: AxisTitles(
-                                    sideTitles: SideTitles(
-                                      showTitles: true,
-                                      reservedSize: 80,
-                                      getTitlesWidget: (value, meta) {
-                                        int idx = value.toInt();
-                                        if (idx >= 0 &&
-                                            idx < diseaseNames.length) {
-                                          // Truncate long disease names for better display
-                                          final name = diseaseNames[idx];
-                                          // Truncate to 15 characters and add ellipsis
-                                          final displayName =
-                                              name.length > 15
-                                                  ? '${name.substring(0, 15)}...'
-                                                  : name;
-                                          return Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 8.0,
-                                            ),
-                                            child: Tooltip(
-                                              message:
-                                                  name, // Show full name on hover
-                                              child: Text(
-                                                displayName,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFF6B7280),
-                                                  fontSize: 11,
+                                      ),
+                                      titlesData: FlTitlesData(
+                                        leftTitles: AxisTitles(
+                                          sideTitles: SideTitles(
+                                            showTitles: true,
+                                            reservedSize:
+                                                isSmallScreen ? 30 : 40,
+                                            getTitlesWidget:
+                                                (value, meta) => Text(
+                                                  value.toInt().toString(),
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    color: const Color(
+                                                      0xFF6B7280,
+                                                    ),
+                                                    fontSize:
+                                                        isSmallScreen ? 10 : 12,
+                                                  ),
                                                 ),
-                                                textAlign: TextAlign.center,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        bottomTitles: AxisTitles(
+                                          sideTitles: SideTitles(
+                                            showTitles: true,
+                                            reservedSize:
+                                                isSmallScreen ? 60 : 80,
+                                            getTitlesWidget: (value, meta) {
+                                              int idx = value.toInt();
+                                              if (idx >= 0 &&
+                                                  idx < diseaseNames.length) {
+                                                // Truncate long disease names for better display
+                                                final name = diseaseNames[idx];
+                                                // Truncate to 15 characters and add ellipsis
+                                                final displayName =
+                                                    name.length > 15
+                                                        ? '${name.substring(0, 15)}...'
+                                                        : name;
+                                                return Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        top: 8.0,
+                                                      ),
+                                                  child: Tooltip(
+                                                    message:
+                                                        name, // Show full name on hover
+                                                    child: Text(
+                                                      displayName,
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: const Color(
+                                                          0xFF6B7280,
+                                                        ),
+                                                        fontSize:
+                                                            isSmallScreen
+                                                                ? 9
+                                                                : 11,
+                                                      ),
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                              return const SizedBox.shrink();
+                                            },
+                                            interval: 1,
+                                          ),
+                                        ),
+                                        topTitles: AxisTitles(
+                                          sideTitles: SideTitles(
+                                            showTitles: false,
+                                          ),
+                                        ),
+                                        rightTitles: AxisTitles(
+                                          sideTitles: SideTitles(
+                                            showTitles: false,
+                                          ),
+                                        ),
+                                      ),
+                                      borderData: FlBorderData(
+                                        show: true,
+                                        border: Border.all(
+                                          color: Colors.grey.shade300,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      barGroups: List.generate(
+                                        diseaseCounts.length,
+                                        (index) => BarChartGroupData(
+                                          x: index,
+                                          barRods: [
+                                            BarChartRodData(
+                                              toY:
+                                                  diseaseCounts[index]
+                                                      .toDouble(),
+                                              color: Colors.red,
+                                              width: isSmallScreen ? 20 : 28,
+                                              borderRadius:
+                                                  const BorderRadius.only(
+                                                    topLeft: Radius.circular(4),
+                                                    topRight: Radius.circular(
+                                                      4,
+                                                    ),
+                                                  ),
+                                              gradient: LinearGradient(
+                                                colors: [
+                                                  Colors.red.shade600,
+                                                  Colors.red.shade400,
+                                                ],
+                                                begin: Alignment.bottomCenter,
+                                                end: Alignment.topCenter,
                                               ),
                                             ),
-                                          );
-                                        }
-                                        return const SizedBox.shrink();
-                                      },
-                                      interval: 1,
-                                    ),
-                                  ),
-                                  topTitles: AxisTitles(
-                                    sideTitles: SideTitles(showTitles: false),
-                                  ),
-                                  rightTitles: AxisTitles(
-                                    sideTitles: SideTitles(showTitles: false),
-                                  ),
-                                ),
-                                borderData: FlBorderData(
-                                  show: true,
-                                  border: Border.all(
-                                    color: Colors.grey.shade300,
-                                    width: 2,
-                                  ),
-                                ),
-                                barGroups: List.generate(
-                                  diseaseCounts.length,
-                                  (index) => BarChartGroupData(
-                                    x: index,
-                                    barRods: [
-                                      BarChartRodData(
-                                        toY: diseaseCounts[index].toDouble(),
-                                        color: Colors.red,
-                                        width: 28,
-                                        borderRadius: const BorderRadius.only(
-                                          topLeft: Radius.circular(4),
-                                          topRight: Radius.circular(4),
-                                        ),
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Colors.red.shade600,
-                                            Colors.red.shade400,
                                           ],
-                                          begin: Alignment.bottomCenter,
-                                          end: Alignment.topCenter,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                maxY: (maxCount + 1).toDouble(),
-                                barTouchData: BarTouchData(
-                                  enabled: true,
-                                  touchTooltipData: BarTouchTooltipData(
-                                    getTooltipItem: (
-                                      group,
-                                      groupIndex,
-                                      rod,
-                                      rodIndex,
-                                    ) {
-                                      final diseaseIndex = group.x.toInt();
-                                      if (diseaseIndex >= 0 &&
-                                          diseaseIndex < diseaseNames.length) {
-                                        final diseaseName =
-                                            diseaseNames[diseaseIndex];
-                                        final count = rod.toY.toInt();
+                                      maxY: (maxCount + 1).toDouble(),
+                                      barTouchData: BarTouchData(
+                                        enabled: true,
+                                        touchTooltipData: BarTouchTooltipData(
+                                          getTooltipItem: (
+                                            group,
+                                            groupIndex,
+                                            rod,
+                                            rodIndex,
+                                          ) {
+                                            final diseaseIndex =
+                                                group.x.toInt();
+                                            if (diseaseIndex >= 0 &&
+                                                diseaseIndex <
+                                                    diseaseNames.length) {
+                                              final diseaseName =
+                                                  diseaseNames[diseaseIndex];
+                                              final count = rod.toY.toInt();
 
-                                        return BarTooltipItem(
-                                          '$diseaseName\nTotal: $count',
-                                          const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
+                                              return BarTooltipItem(
+                                                '$diseaseName\nTotal: $count',
+                                                TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize:
+                                                      isSmallScreen ? 12 : 14,
+                                                ),
+                                              );
+                                            }
+                                            return BarTooltipItem(
+                                              'Count: ${rod.toY.toInt()}',
+                                              TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize:
+                                                    isSmallScreen ? 13 : 15,
+                                              ),
+                                            );
+                                          },
+                                          tooltipMargin: 8,
+                                          tooltipPadding: const EdgeInsets.all(
+                                            10,
                                           ),
-                                        );
-                                      }
-                                      return BarTooltipItem(
-                                        'Count: ${rod.toY.toInt()}',
-                                        const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 15,
                                         ),
-                                      );
-                                    },
-                                    tooltipMargin: 8,
-                                    tooltipPadding: const EdgeInsets.all(10),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
                       ];
                     })(),
@@ -476,316 +509,361 @@ class _UserDetailViewState extends State<UserDetailView> {
                       ),
                     )
                   else
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.grey.shade200,
-                          width: 1,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            headingRowHeight: 56,
-                            dataRowMinHeight: 48,
-                            headingRowColor:
-                                WidgetStateProperty.resolveWith<Color?>(
-                                  (states) => const Color(0xFFF9FAFB),
-                                ),
-                            columnSpacing: 40,
-                            horizontalMargin: 28,
-                            dividerThickness: 1,
-                            columns: const [
-                              DataColumn(
-                                label: Text(
-                                  'Timestamp',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF374151),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              DataColumn(
-                                label: Text(
-                                  'Plant Name',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF374151),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              DataColumn(
-                                label: Text(
-                                  'Condition',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF374151),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              DataColumn(
-                                label: Text(
-                                  'Treatment',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF374151),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                            rows:
-                                _getPaginatedRows().asMap().entries.map((
-                                  entry,
-                                ) {
-                                  final idx = entry.key;
-                                  final row = entry.value;
-                                  // Use controller's isPlantHealthy method to properly detect healthy plants
-                                  final isHealthy = widget.controller
-                                      .isPlantHealthy(
-                                        row['disease']?.toString(),
-                                      );
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isSmallScreen = constraints.maxWidth < 900;
+                        final screenWidth = constraints.maxWidth;
 
-                                  return DataRow(
-                                    color:
-                                        WidgetStateProperty.resolveWith<Color?>(
-                                          (states) {
-                                            if (idx % 2 == 0) {
-                                              return const Color(0xFFFAFAFA);
-                                            }
-                                            return Colors.white;
-                                          },
-                                        ),
-                                    cells: [
-                                      DataCell(
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.access_time_rounded,
-                                              size: 16,
-                                              color: Colors.grey.shade500,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              row['timestamp'] is Timestamp
-                                                  ? DateFormat(
-                                                    'MMM dd, yyyy HH:mm',
-                                                  ).format(
-                                                    (row['timestamp']
-                                                            as Timestamp)
-                                                        .toDate(),
-                                                  )
-                                                  : row['timestamp']
-                                                          ?.toString() ??
-                                                      'N/A',
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                color: Color(0xFF4B5563),
-                                              ),
-                                            ),
-                                          ],
+                        return Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Colors.grey.shade200,
+                              width: 1,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minWidth:
+                                      isSmallScreen
+                                          ? screenWidth - 48
+                                          : screenWidth - 100,
+                                ),
+                                child: DataTable(
+                                  headingRowHeight: isSmallScreen ? 50 : 56,
+                                  dataRowMinHeight: isSmallScreen ? 50 : 56,
+                                  dataRowMaxHeight: isSmallScreen ? 60 : 68,
+                                  headingRowColor:
+                                      WidgetStateProperty.resolveWith<Color?>(
+                                        (states) => const Color(0xFFF9FAFB),
+                                      ),
+                                  columnSpacing: isSmallScreen ? 20 : 60,
+                                  horizontalMargin: isSmallScreen ? 20 : 40,
+                                  dividerThickness: 1,
+                                  columns: [
+                                    DataColumn(
+                                      label: Text(
+                                        'Timestamp',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF374151),
+                                          fontSize: isSmallScreen ? 13 : 14,
                                         ),
                                       ),
-                                      DataCell(
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.local_florist_rounded,
-                                              size: 16,
-                                              color: Colors.green.shade400,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              row['name']?.toString() ?? 'N/A',
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                color: Color(0xFF1F2937),
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                          ],
+                                    ),
+                                    DataColumn(
+                                      label: Text(
+                                        'Plant Name',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF374151),
+                                          fontSize: isSmallScreen ? 13 : 14,
                                         ),
                                       ),
-                                      DataCell(
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 4,
-                                          ),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color:
-                                                  isHealthy
-                                                      ? Colors.green.shade50
-                                                      : Colors.red.shade50,
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  isHealthy
-                                                      ? Icons
-                                                          .check_circle_rounded
-                                                      : Icons.warning_rounded,
-                                                  size: 16,
-                                                  color:
-                                                      isHealthy
-                                                          ? Colors
-                                                              .green
-                                                              .shade700
-                                                          : Colors.red.shade700,
-                                                ),
-                                                const SizedBox(width: 6),
-                                                Flexible(
-                                                  child: Text(
-                                                    row['disease']
-                                                            ?.toString() ??
-                                                        'N/A',
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                      color:
-                                                          isHealthy
-                                                              ? Colors
-                                                                  .green
-                                                                  .shade700
-                                                              : Colors
-                                                                  .red
-                                                                  .shade700,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                    maxLines: 2,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
+                                    ),
+                                    DataColumn(
+                                      label: Text(
+                                        'Condition',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF374151),
+                                          fontSize: isSmallScreen ? 13 : 14,
+                                        ),
+                                      ),
+                                    ),
+                                    DataColumn(
+                                      label: Text(
+                                        'Treatment',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF374151),
+                                          fontSize: isSmallScreen ? 13 : 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  rows:
+                                      _getPaginatedRows().asMap().entries.map((
+                                        entry,
+                                      ) {
+                                        final idx = entry.key;
+                                        final row = entry.value;
+                                        // Use controller's isPlantHealthy method to properly detect healthy plants
+                                        final isHealthy = widget.controller
+                                            .isPlantHealthy(
+                                              row['disease']?.toString(),
+                                            );
+
+                                        return DataRow(
+                                          color:
+                                              WidgetStateProperty.resolveWith<
+                                                Color?
+                                              >((states) {
+                                                if (idx % 2 == 0) {
+                                                  return const Color(
+                                                    0xFFFAFAFA,
+                                                  );
+                                                }
+                                                return Colors.white;
+                                              }),
+                                          cells: [
+                                            DataCell(
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.access_time_rounded,
+                                                    size: 16,
+                                                    color: Colors.grey.shade500,
                                                   ),
-                                                ),
-                                              ],
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    row['timestamp']
+                                                            is Timestamp
+                                                        ? DateFormat(
+                                                          'MMM dd, yyyy HH:mm',
+                                                        ).format(
+                                                          (row['timestamp']
+                                                                  as Timestamp)
+                                                              .toDate(),
+                                                        )
+                                                        : row['timestamp']
+                                                                ?.toString() ??
+                                                            'N/A',
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      color: Color(0xFF4B5563),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                                      ),
-                                      DataCell(
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 4,
-                                          ),
-                                          child:
-                                              isHealthy
-                                                  ? Row(
+                                            DataCell(
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.local_florist_rounded,
+                                                    size: 16,
+                                                    color:
+                                                        Colors.green.shade400,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    row['name']?.toString() ??
+                                                        'N/A',
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      color: Color(0xFF1F2937),
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            DataCell(
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      vertical: 4,
+                                                    ),
+                                                child: Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        isHealthy
+                                                            ? Colors
+                                                                .green
+                                                                .shade50
+                                                            : Colors
+                                                                .red
+                                                                .shade50,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          6,
+                                                        ),
+                                                  ),
+                                                  child: Row(
                                                     mainAxisSize:
                                                         MainAxisSize.min,
                                                     children: [
                                                       Icon(
-                                                        Icons
-                                                            .health_and_safety_rounded,
+                                                        isHealthy
+                                                            ? Icons
+                                                                .check_circle_rounded
+                                                            : Icons
+                                                                .warning_rounded,
                                                         size: 16,
                                                         color:
-                                                            Colors
-                                                                .grey
-                                                                .shade400,
+                                                            isHealthy
+                                                                ? Colors
+                                                                    .green
+                                                                    .shade700
+                                                                : Colors
+                                                                    .red
+                                                                    .shade700,
                                                       ),
                                                       const SizedBox(width: 6),
                                                       Flexible(
                                                         child: Text(
-                                                          'No treatment needed',
+                                                          row['disease']
+                                                                  ?.toString() ??
+                                                              'N/A',
                                                           style: TextStyle(
-                                                            color:
-                                                                Colors
-                                                                    .grey
-                                                                    .shade600,
                                                             fontSize: 13,
-                                                            fontStyle:
-                                                                FontStyle
-                                                                    .italic,
+                                                            color:
+                                                                isHealthy
+                                                                    ? Colors
+                                                                        .green
+                                                                        .shade700
+                                                                    : Colors
+                                                                        .red
+                                                                        .shade700,
+                                                            fontWeight:
+                                                                FontWeight.w600,
                                                           ),
+                                                          maxLines: 2,
+                                                          overflow:
+                                                              TextOverflow
+                                                                  .ellipsis,
                                                         ),
                                                       ),
                                                     ],
-                                                  )
-                                                  : Material(
-                                                    color: Colors.transparent,
-                                                    child: InkWell(
-                                                      onTap:
-                                                          () =>
-                                                              _showPlantDetailsDialog(
-                                                                context,
-                                                                row,
-                                                              ),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
-                                                          ),
-                                                      child: Container(
-                                                        padding:
-                                                            const EdgeInsets.symmetric(
-                                                              horizontal: 12,
-                                                              vertical: 8,
-                                                            ),
-                                                        decoration: BoxDecoration(
-                                                          gradient:
-                                                              LinearGradient(
-                                                                colors: [
-                                                                  Colors
-                                                                      .green
-                                                                      .shade400,
-                                                                  Colors
-                                                                      .green
-                                                                      .shade600,
-                                                                ],
-                                                              ),
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                8,
-                                                              ),
-                                                        ),
-                                                        child: const Row(
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            DataCell(
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      vertical: 4,
+                                                    ),
+                                                child:
+                                                    isHealthy
+                                                        ? Row(
                                                           mainAxisSize:
                                                               MainAxisSize.min,
                                                           children: [
                                                             Icon(
                                                               Icons
-                                                                  .visibility_rounded,
-                                                              color:
-                                                                  Colors.white,
+                                                                  .health_and_safety_rounded,
                                                               size: 16,
+                                                              color:
+                                                                  Colors
+                                                                      .grey
+                                                                      .shade400,
                                                             ),
-                                                            SizedBox(width: 6),
-                                                            Text(
-                                                              'View Treatment',
-                                                              style: TextStyle(
-                                                                color:
-                                                                    Colors
-                                                                        .white,
-                                                                fontSize: 13,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600,
+                                                            const SizedBox(
+                                                              width: 6,
+                                                            ),
+                                                            Flexible(
+                                                              child: Text(
+                                                                'No treatment needed',
+                                                                style: TextStyle(
+                                                                  color:
+                                                                      Colors
+                                                                          .grey
+                                                                          .shade600,
+                                                                  fontSize: 13,
+                                                                  fontStyle:
+                                                                      FontStyle
+                                                                          .italic,
+                                                                ),
                                                               ),
                                                             ),
                                                           ],
+                                                        )
+                                                        : Material(
+                                                          color:
+                                                              Colors
+                                                                  .transparent,
+                                                          child: InkWell(
+                                                            onTap:
+                                                                () =>
+                                                                    _showPlantDetailsDialog(
+                                                                      context,
+                                                                      row,
+                                                                    ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                            child: Container(
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        12,
+                                                                    vertical: 8,
+                                                                  ),
+                                                              decoration: BoxDecoration(
+                                                                gradient: LinearGradient(
+                                                                  colors: [
+                                                                    Colors
+                                                                        .green
+                                                                        .shade400,
+                                                                    Colors
+                                                                        .green
+                                                                        .shade600,
+                                                                  ],
+                                                                ),
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      8,
+                                                                    ),
+                                                              ),
+                                                              child: const Row(
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  Icon(
+                                                                    Icons
+                                                                        .visibility_rounded,
+                                                                    color:
+                                                                        Colors
+                                                                            .white,
+                                                                    size: 16,
+                                                                  ),
+                                                                  SizedBox(
+                                                                    width: 6,
+                                                                  ),
+                                                                  Text(
+                                                                    'View Treatment',
+                                                                    style: TextStyle(
+                                                                      color:
+                                                                          Colors
+                                                                              .white,
+                                                                      fontSize:
+                                                                          13,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w600,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ),
                                                         ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                }).toList(),
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      }).toList(),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                   const SizedBox(height: 16),
                   // Pagination Controls
@@ -1115,133 +1193,72 @@ class _UserDetailViewState extends State<UserDetailView> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.green.shade400,
-                                Colors.green.shade600,
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            color: Colors.green.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.green.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
                           ),
                           child: const Icon(
-                            Icons.eco_rounded,
-                            color: Colors.white,
-                            size: 28,
+                            Icons.eco,
+                            color: Colors.green,
+                            size: 24,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Plant Details',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1A1A1A),
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Scan information',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF6B7280),
-                              ),
-                            ),
-                          ],
+                        const SizedBox(width: 12),
+                        Text(
+                          plant['name']?.toString() ?? 'N/A',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
+                    // Plant Image
+                    if (plant['base64Image'] != null &&
+                        plant['base64Image'].toString().trim().isNotEmpty)
+                      _buildPlantImage(plant['base64Image']),
+                    if (plant['base64Image'] != null &&
+                        plant['base64Image'].toString().trim().isNotEmpty)
+                      const SizedBox(height: 16),
                     _buildDetailRow(
-                      icon: Icons.access_time_rounded,
-                      title: 'Date & Time',
-                      value:
-                          plant['timestamp'] is Timestamp
-                              ? DateFormat('MMM dd, yyyy HH:mm').format(
-                                (plant['timestamp'] as Timestamp).toDate(),
-                              )
-                              : plant['timestamp']?.toString() ?? 'N/A',
-                    ),
-                    const SizedBox(height: 14),
-                    _buildDetailRow(
-                      icon: Icons.local_florist_rounded,
-                      title: 'Plant Name',
-                      value: plant['name']?.toString() ?? 'N/A',
-                    ),
-                    const SizedBox(height: 14),
-                    _buildDetailRow(
-                      icon: Icons.warning_rounded,
-                      title: 'Condition',
+                      icon: Icons.bug_report,
+                      title: 'Disease',
                       value: plant['disease']?.toString() ?? 'N/A',
                       isDisease: true,
                     ),
-                    // Check if plant is not healthy (has a disease) using controller's method
                     if (plant['disease'] != null &&
                         !widget.controller.isPlantHealthy(
                           plant['disease']?.toString(),
                         )) ...[
-                      const SizedBox(height: 14),
-                      _buildDetailRow(
-                        icon: Icons.medical_services_rounded,
-                        title: 'Treatment',
-                        value:
-                            plant['treatment']?.toString() ??
+                      const SizedBox(height: 16),
+                      _buildTreatmentSection(
+                        plant['treatment']?.toString() ??
                             'No treatment available',
-                        isTreatment: true,
                       ),
                     ],
-                    const SizedBox(height: 28),
-                    SizedBox(
-                      width: double.infinity,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.green.shade400,
-                              Colors.green.shade600,
-                            ],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.green.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                    const SizedBox(height: 24),
+                    // Close Button
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
                         ),
-                        child: TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Close',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        backgroundColor: Colors.green.withOpacity(0.1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Close',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -1330,6 +1347,372 @@ class _UserDetailViewState extends State<UserDetailView> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileImage(Map<String, dynamic> userInfo) {
+    try {
+      final base64Image = userInfo['base64image'];
+      if (base64Image != null && base64Image.toString().trim().isNotEmpty) {
+        String imageString = base64Image.toString().trim();
+
+        // Remove data URL prefix if present (e.g., "data:image/png;base64,")
+        if (imageString.contains(',')) {
+          imageString = imageString.split(',').last;
+        }
+
+        Uint8List imageBytes = base64Decode(imageString);
+        return Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.green, Colors.green.shade400],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.green.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.memory(
+              imageBytes,
+              width: 48,
+              height: 48,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (context, error, stackTrace) {
+                // If image fails to load, show default icon
+                return Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade700,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.person_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // If decoding fails, show default icon
+      debugPrint('Error decoding profile image: $e');
+    }
+
+    // Default icon fallback
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green.shade400, Colors.green.shade600],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Icon(Icons.person_rounded, color: Colors.white, size: 24),
+    );
+  }
+
+  Widget _buildPlantImage(dynamic base64Image) {
+    try {
+      if (base64Image != null && base64Image.toString().trim().isNotEmpty) {
+        String imageString = base64Image.toString().trim();
+
+        // Remove data URL prefix if present (e.g., "data:image/png;base64,")
+        if (imageString.contains(',')) {
+          imageString = imageString.split(',').last;
+        }
+
+        Uint8List imageBytes = base64Decode(imageString);
+        return Container(
+          width: double.infinity,
+          height: 200,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green.shade200, width: 2),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.memory(
+              imageBytes,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (context, error, stackTrace) {
+                // If image fails to load, show placeholder
+                return Container(
+                  width: double.infinity,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.image_not_supported_rounded,
+                        size: 48,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Image not available',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // If decoding fails, show placeholder
+      debugPrint('Error decoding plant image: $e');
+    }
+
+    // Default placeholder if no image
+    return Container(
+      width: double.infinity,
+      height: 200,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.local_florist_rounded,
+            size: 48,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'No image available',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTreatmentSection(String treatmentText) {
+    // Parse the treatment text to identify sections and bullet points
+    final sections = <Map<String, dynamic>>[];
+    final lines = treatmentText.split('\n');
+
+    String? currentSection;
+    List<String> currentItems = [];
+
+    for (var line in lines) {
+      line = line.trim();
+      if (line.isEmpty) continue;
+
+      // Check if it's a section header (ends with colon and contains keywords)
+      final isSectionHeader =
+          line.endsWith(':') &&
+          (line.toLowerCase().contains('actions') ||
+              line.toLowerCase().contains('measures') ||
+              line.toLowerCase().contains('monitoring') ||
+              line.toLowerCase().contains('preventive') ||
+              line.toLowerCase().contains('immediate'));
+
+      if (isSectionHeader) {
+        // Save previous section if exists
+        if (currentSection != null && currentItems.isNotEmpty) {
+          sections.add({
+            'title': currentSection,
+            'items': List<String>.from(currentItems),
+          });
+        }
+        currentSection = line.replaceAll(':', '').trim();
+        currentItems = [];
+      } else {
+        // Check if it's a bullet point (starts with bullet, dash, or asterisk)
+        final isBullet =
+            line.startsWith('•') ||
+            line.startsWith('-') ||
+            line.startsWith('*') ||
+            (line.length > 0 && RegExp(r'^\s*[•\-\*]').hasMatch(line));
+
+        if (isBullet) {
+          // It's a bullet point - clean it up
+          String item = line.replaceFirst(RegExp(r'^\s*[•\-\*]\s*'), '').trim();
+          if (item.isNotEmpty) {
+            // If no current section, create a default one
+            if (currentSection == null) {
+              currentSection = 'Treatment';
+            }
+            currentItems.add(item);
+          }
+        } else if (currentSection != null) {
+          // Regular text line in a section
+          currentItems.add(line);
+        } else {
+          // If no section yet, treat as general text
+          if (currentSection == null) {
+            currentSection = 'Treatment';
+          }
+          currentItems.add(line);
+        }
+      }
+    }
+
+    // Add the last section
+    if (currentSection != null && currentItems.isNotEmpty) {
+      sections.add({
+        'title': currentSection,
+        'items': List<String>.from(currentItems),
+      });
+    }
+
+    // If no sections found, treat entire text as single section
+    if (sections.isEmpty) {
+      sections.add({
+        'title': 'Treatment',
+        'items': [treatmentText],
+      });
+    }
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 400),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.withOpacity(0.3), width: 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Treatment Header
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.medical_services,
+                    color: Colors.green,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Treatment',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Treatment Content (Scrollable)
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ...sections.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final section = entry.value;
+                    final sectionTitle = section['title'] as String;
+                    final items = section['items'] as List<String>;
+
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        bottom: index < sections.length - 1 ? 16 : 0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Section Title
+                          if (sectionTitle != 'Treatment')
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                sectionTitle,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                          // Section Items
+                          ...items.map((item) {
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                left: 4,
+                                bottom: 8,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 7, right: 10),
+                                    child: Icon(
+                                      Icons.circle,
+                                      size: 6,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      item,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.green,
+                                        height: 1.6,
+                                        letterSpacing: 0.2,
+                                      ),
+                                      textAlign: TextAlign.left,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ),
             ),
           ),
         ],

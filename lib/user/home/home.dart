@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:cropcure/user/home/home_controller.dart';
 import 'package:cropcure/user/home/daily_reminder_controller.dart';
 import 'package:cropcure/user/profile/profile_controller.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -683,6 +685,19 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                         ),
+                        DataColumn(
+                          label: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8.0),
+                            child: Text(
+                              'Actions',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                       rows:
                           _getPaginatedRows().asMap().entries.map((entry) {
@@ -835,6 +850,25 @@ class _HomePageState extends State<HomePage> {
                                                 ),
                                               ),
                                             ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Center(
+                                    child: IconButton(
+                                      onPressed:
+                                          () => _showDeleteConfirmation(
+                                            context,
+                                            row,
+                                          ),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red,
+                                        size: 22,
+                                      ),
+                                      tooltip: 'Delete',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1479,8 +1513,8 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Text(
-                          'Plant Details',
+                        Text(
+                          plant['name']?.toString() ?? 'N/A',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -1490,23 +1524,30 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    _buildDetailRow(
-                      icon: Icons.calendar_today,
-                      title: 'Date & Time',
-                      value:
-                          plant['timestamp'] is Timestamp
-                              ? DateFormat('MMM dd, yyyy HH:mm').format(
-                                (plant['timestamp'] as Timestamp).toDate(),
-                              )
-                              : plant['timestamp']?.toString() ?? 'N/A',
-                    ),
-                    const SizedBox(height: 16),
-                    _buildDetailRow(
-                      icon: Icons.local_florist,
-                      title: 'Plant Name',
-                      value: plant['name']?.toString() ?? 'N/A',
-                    ),
-                    const SizedBox(height: 16),
+                    // Plant Image
+                    if (plant['base64Image'] != null &&
+                        plant['base64Image'].toString().trim().isNotEmpty)
+                      _buildPlantImage(plant['base64Image']),
+                    if (plant['base64Image'] != null &&
+                        plant['base64Image'].toString().trim().isNotEmpty)
+                      // const SizedBox(height: 20),
+                      // _buildDetailRow(
+                      //   icon: Icons.calendar_today,
+                      //   title: 'Date & Time',
+                      //   value:
+                      //       plant['timestamp'] is Timestamp
+                      //           ? DateFormat('MMM dd, yyyy HH:mm').format(
+                      //             (plant['timestamp'] as Timestamp).toDate(),
+                      //           )
+                      //           : plant['timestamp']?.toString() ?? 'N/A',
+                      // ),
+                      // const SizedBox(height: 16),
+                      // _buildDetailRow(
+                      //   icon: Icons.local_florist,
+                      //   title: 'Plant Name',
+                      //   value: plant['name']?.toString() ?? 'N/A',
+                      // ),
+                      const SizedBox(height: 16),
                     _buildDetailRow(
                       icon: Icons.bug_report,
                       title: 'Disease',
@@ -1516,47 +1557,203 @@ class _HomePageState extends State<HomePage> {
                     if (plant['disease'] != null &&
                         !_isPlantHealthy(plant['disease']?.toString())) ...[
                       const SizedBox(height: 16),
-                      _buildDetailRow(
-                        icon: Icons.medical_services,
-                        title: 'Treatment',
-                        value:
-                            plant['treatment']?.toString() ??
+                      _buildTreatmentSection(
+                        plant['treatment']?.toString() ??
                             'No treatment available',
-                        isTreatment: true,
                       ),
                     ],
                     const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 12,
-                            ),
-                            backgroundColor: Colors.green.withOpacity(0.1),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text(
-                            'Close',
-                            style: TextStyle(
-                              color: Colors.green,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                    // Close Button
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
                         ),
-                      ],
+                        backgroundColor: Colors.green.withOpacity(0.1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Close',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmation(
+    BuildContext context,
+    Map<String, dynamic> plant, {
+    bool closeDetailsDialog = false,
+  }) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+              SizedBox(width: 12),
+              Text(
+                'Delete Plant Record',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Text(
+            'Are you sure you want to delete this plant record?\n\n'
+            'Plant: ${plant['name'] ?? 'N/A'}\n'
+            'Disease: ${plant['disease'] ?? 'N/A'}\n\n'
+            'This action cannot be undone.',
+            style: const TextStyle(fontSize: 15),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey.shade700,
+              ),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                // Close confirmation dialog
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+
+                // Close plant details dialog if it was opened from there
+                if (closeDetailsDialog && Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+
+                // Delete the plant
+                String? documentId = plant['documentId']?.toString();
+
+                // Debug: Print plant data to see what we have
+                print('Plant data keys: ${plant.keys}');
+                print('Document ID: $documentId');
+
+                // If documentId is missing, try to find it by matching plant data
+                if (documentId == null || documentId.isEmpty) {
+                  // Find the document by matching userId and name (simpler query)
+                  try {
+                    final userId = FirebaseAuth.instance.currentUser?.uid;
+                    if (userId != null) {
+                      // First try with userId and name
+                      var querySnapshot =
+                          await FirebaseFirestore.instance
+                              .collection('plants')
+                              .where('userId', isEqualTo: userId)
+                              .where(
+                                'name',
+                                isEqualTo: plant['name']?.toString(),
+                              )
+                              .orderBy('timestamp', descending: true)
+                              .limit(10)
+                              .get();
+
+                      // Filter results in memory to match disease and timestamp if available
+                      if (querySnapshot.docs.isNotEmpty) {
+                        for (var doc in querySnapshot.docs) {
+                          final data = doc.data();
+                          bool matches = true;
+
+                          // Match disease
+                          if (plant['disease'] != null &&
+                              data['disease']?.toString() !=
+                                  plant['disease']?.toString()) {
+                            matches = false;
+                          }
+
+                          // Match timestamp if available (within 5 seconds tolerance)
+                          if (matches &&
+                              plant['timestamp'] != null &&
+                              data['timestamp'] != null) {
+                            Timestamp? plantTimestamp;
+                            Timestamp? dataTimestamp;
+
+                            if (plant['timestamp'] is Timestamp) {
+                              plantTimestamp = plant['timestamp'] as Timestamp;
+                            }
+                            if (data['timestamp'] is Timestamp) {
+                              dataTimestamp = data['timestamp'] as Timestamp;
+                            }
+
+                            if (plantTimestamp != null &&
+                                dataTimestamp != null) {
+                              final diff =
+                                  (plantTimestamp.millisecondsSinceEpoch -
+                                          dataTimestamp.millisecondsSinceEpoch)
+                                      .abs();
+                              if (diff > 5000) {
+                                // 5 seconds tolerance
+                                matches = false;
+                              }
+                            }
+                          }
+
+                          if (matches) {
+                            documentId = doc.id;
+                            print('Found document ID: $documentId');
+                            break;
+                          }
+                        }
+                      }
+
+                      if (documentId == null || documentId.isEmpty) {
+                        print('No matching document found');
+                      }
+                    }
+                  } catch (e) {
+                    print('Error finding document ID: $e');
+                  }
+                }
+
+                if (documentId != null && documentId.isNotEmpty) {
+                  await _homeController.deletePlant(documentId);
+                  // Refresh the list
+                  if (mounted) {
+                    await _homeController.fetchPlants();
+                  }
+                } else {
+                  Get.snackbar(
+                    'Error',
+                    'Unable to delete: Plant ID not found. Please try refreshing the page.',
+                    snackPosition: SnackPosition.TOP,
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                    duration: const Duration(seconds: 3),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
         );
       },
     );
@@ -1645,6 +1842,295 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTreatmentSection(String treatmentText) {
+    // Parse the treatment text to identify sections and bullet points
+    final sections = <Map<String, dynamic>>[];
+    final lines = treatmentText.split('\n');
+
+    String? currentSection;
+    List<String> currentItems = [];
+
+    for (var line in lines) {
+      line = line.trim();
+      if (line.isEmpty) continue;
+
+      // Check if it's a section header (ends with colon and contains keywords)
+      final isSectionHeader =
+          line.endsWith(':') &&
+          (line.toLowerCase().contains('actions') ||
+              line.toLowerCase().contains('measures') ||
+              line.toLowerCase().contains('monitoring') ||
+              line.toLowerCase().contains('preventive') ||
+              line.toLowerCase().contains('immediate'));
+
+      if (isSectionHeader) {
+        // Save previous section if exists
+        if (currentSection != null && currentItems.isNotEmpty) {
+          sections.add({
+            'title': currentSection,
+            'items': List<String>.from(currentItems),
+          });
+        }
+        currentSection = line.replaceAll(':', '').trim();
+        currentItems = [];
+      } else {
+        // Check if it's a bullet point (starts with bullet, dash, or asterisk)
+        final isBullet =
+            line.startsWith('•') ||
+            line.startsWith('-') ||
+            line.startsWith('*') ||
+            (line.length > 0 && RegExp(r'^\s*[•\-\*]').hasMatch(line));
+
+        if (isBullet) {
+          // It's a bullet point - clean it up
+          String item = line.replaceFirst(RegExp(r'^\s*[•\-\*]\s*'), '').trim();
+          if (item.isNotEmpty) {
+            // If no current section, create a default one
+            if (currentSection == null) {
+              currentSection = 'Treatment';
+            }
+            currentItems.add(item);
+          }
+        } else if (currentSection != null) {
+          // Regular text line in a section
+          currentItems.add(line);
+        } else {
+          // If no section yet, treat as general text
+          if (currentSection == null) {
+            currentSection = 'Treatment';
+          }
+          currentItems.add(line);
+        }
+      }
+    }
+
+    // Add the last section
+    if (currentSection != null && currentItems.isNotEmpty) {
+      sections.add({
+        'title': currentSection,
+        'items': List<String>.from(currentItems),
+      });
+    }
+
+    // If no sections found, treat entire text as single section
+    if (sections.isEmpty) {
+      sections.add({
+        'title': 'Treatment',
+        'items': [treatmentText],
+      });
+    }
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 400),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.withOpacity(0.3), width: 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Treatment Header
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.medical_services,
+                    color: Colors.green,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Treatment',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Treatment Content (Scrollable)
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ...sections.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final section = entry.value;
+                    final sectionTitle = section['title'] as String;
+                    final items = section['items'] as List<String>;
+
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        bottom: index < sections.length - 1 ? 16 : 0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Section Title
+                          if (sectionTitle != 'Treatment')
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                sectionTitle,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                          // Section Items
+                          ...items.map((item) {
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                left: 4,
+                                bottom: 8,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 7, right: 10),
+                                    child: Icon(
+                                      Icons.circle,
+                                      size: 6,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      item,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.green,
+                                        height: 1.6,
+                                        letterSpacing: 0.2,
+                                      ),
+                                      textAlign: TextAlign.left,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlantImage(dynamic base64Image) {
+    try {
+      if (base64Image != null && base64Image.toString().trim().isNotEmpty) {
+        String imageString = base64Image.toString().trim();
+
+        // Remove data URL prefix if present (e.g., "data:image/png;base64,")
+        if (imageString.contains(',')) {
+          imageString = imageString.split(',').last;
+        }
+
+        Uint8List imageBytes = base64Decode(imageString);
+        return Container(
+          width: double.infinity,
+          height: 200,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green.shade200, width: 2),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.memory(
+              imageBytes,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (context, error, stackTrace) {
+                // If image fails to load, show placeholder
+                return Container(
+                  width: double.infinity,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.image_not_supported_rounded,
+                        size: 48,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Image not available',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // If decoding fails, show placeholder
+      debugPrint('Error decoding plant image: $e');
+    }
+
+    // Default placeholder if no image
+    return Container(
+      width: double.infinity,
+      height: 200,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.local_florist_rounded,
+            size: 48,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'No image available',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
           ),
         ],
       ),

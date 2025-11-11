@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cropcure/admin/controller.dart';
 import 'package:cropcure/admin/widgets/enhanced_stat_card.dart';
@@ -73,7 +75,7 @@ class UserCard extends StatelessWidget {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(2),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -95,11 +97,7 @@ class UserCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.person_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
+                        child: _buildProfileImage(user, isOnline),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -406,6 +404,62 @@ class UserCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildProfileImage(Map<String, dynamic> user, bool isOnline) {
+    try {
+      final base64Image = user['base64image'];
+      if (base64Image != null && base64Image.toString().trim().isNotEmpty) {
+        String imageString = base64Image.toString().trim();
+
+        // Remove data URL prefix if present (e.g., "data:image/png;base64,")
+        if (imageString.contains(',')) {
+          imageString = imageString.split(',').last;
+        }
+
+        Uint8List imageBytes = base64Decode(imageString);
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.memory(
+            imageBytes,
+            width: 56,
+            height: 56,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (context, error, stackTrace) {
+              // If image fails to load, show default icon
+              return Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: (isOnline ? Colors.green : Colors.grey).shade700,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.person_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              );
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      // If decoding fails, show default icon
+      debugPrint('Error decoding profile image: $e');
+    }
+
+    // Default icon fallback
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        color: (isOnline ? Colors.green : Colors.grey).shade700,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Icon(Icons.person_rounded, color: Colors.white, size: 28),
     );
   }
 }

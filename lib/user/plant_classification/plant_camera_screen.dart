@@ -981,27 +981,8 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
                     ),
                     const SizedBox(height: 20),
                     // Treatment Content
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.green[50],
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(color: Colors.green[200]!),
-                      ),
-                      constraints: BoxConstraints(
-                        maxHeight: 200, // Adjust as needed for your dialog size
-                      ),
-                      child: SingleChildScrollView(
-                        child: Text(
-                          _plantRecognizer.treatmentRecommendation.value,
-                          style: TextStyle(
-                            fontSize: 15,
-                            height: 1.5,
-                            color: Colors.green[900],
-                          ),
-                          // Remove maxLines and overflow for full display
-                        ),
-                      ),
+                    _buildTreatmentContent(
+                      _plantRecognizer.treatmentRecommendation.value,
                     ),
                     const SizedBox(height: 25),
                     // Action Button
@@ -1058,6 +1039,171 @@ class _PlantCameraScreenState extends State<PlantCameraScreen>
         );
       }
     }
+  }
+
+  Widget _buildTreatmentContent(String treatmentText) {
+    // Parse the treatment text to identify sections and bullet points
+    final sections = <Map<String, dynamic>>[];
+    final lines = treatmentText.split('\n');
+
+    String? currentSection;
+    List<String> currentItems = [];
+
+    for (var line in lines) {
+      line = line.trim();
+      if (line.isEmpty) continue;
+
+      // Check if it's a section header (ends with colon and contains keywords)
+      final isSectionHeader =
+          line.endsWith(':') &&
+          (line.toLowerCase().contains('actions') ||
+              line.toLowerCase().contains('measures') ||
+              line.toLowerCase().contains('monitoring') ||
+              line.toLowerCase().contains('preventive') ||
+              line.toLowerCase().contains('immediate'));
+
+      if (isSectionHeader) {
+        // Save previous section if exists
+        if (currentSection != null && currentItems.isNotEmpty) {
+          sections.add({
+            'title': currentSection,
+            'items': List<String>.from(currentItems),
+          });
+        }
+        currentSection = line.replaceAll(':', '').trim();
+        currentItems = [];
+      } else {
+        // Check if it's a bullet point (starts with bullet, dash, or asterisk)
+        final isBullet =
+            line.startsWith('•') ||
+            line.startsWith('-') ||
+            line.startsWith('*') ||
+            (line.length > 0 && RegExp(r'^\s*[•\-\*]').hasMatch(line)) ||
+            // Also check for numbered lists (1., 2., etc.)
+            RegExp(r'^\d+\.\s').hasMatch(line);
+
+        if (isBullet) {
+          // It's a bullet point - clean it up
+          String item =
+              line
+                  .replaceFirst(RegExp(r'^\s*[•\-\*]\s*'), '')
+                  .replaceFirst(RegExp(r'^\d+\.\s*'), '')
+                  .trim();
+          if (item.isNotEmpty) {
+            // If no current section, create a default one
+            if (currentSection == null) {
+              currentSection = 'Treatment';
+            }
+            currentItems.add(item);
+          }
+        } else if (currentSection != null) {
+          // Regular text line in a section
+          currentItems.add(line);
+        } else {
+          // If no section yet, treat as general text
+          if (currentSection == null) {
+            currentSection = 'Treatment';
+          }
+          currentItems.add(line);
+        }
+      }
+    }
+
+    // Add the last section
+    if (currentSection != null && currentItems.isNotEmpty) {
+      sections.add({
+        'title': currentSection,
+        'items': List<String>.from(currentItems),
+      });
+    }
+
+    // If no sections found, treat entire text as single section
+    if (sections.isEmpty) {
+      sections.add({
+        'title': 'Treatment',
+        'items': [treatmentText],
+      });
+    }
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 350),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.green[200]!),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ...sections.asMap().entries.map((entry) {
+              final index = entry.key;
+              final section = entry.value;
+              final sectionTitle = section['title'] as String;
+              final items = section['items'] as List<String>;
+
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: index < sections.length - 1 ? 16 : 0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Section Title
+                    if (sectionTitle != 'Treatment')
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Text(
+                          sectionTitle,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green[800],
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    // Section Items
+                    ...items.map((item) {
+                      return Padding(
+                        padding: const EdgeInsets.only(left: 4, bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Bullet point
+                            const Padding(
+                              padding: EdgeInsets.only(top: 7, right: 10),
+                              child: Icon(
+                                Icons.circle,
+                                size: 6,
+                                color: Colors.green,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                item,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.green[900],
+                                  height: 1.6,
+                                  letterSpacing: 0.2,
+                                ),
+                                textAlign: TextAlign.left,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -28,6 +29,8 @@ class HomeController extends GetxController {
             if (data['timestamp'] is Timestamp) {
               data['timestamp'] = data['timestamp'];
             }
+            // Include document ID for deletion
+            data['documentId'] = doc.id;
             return data;
           }).toList();
 
@@ -138,5 +141,34 @@ class HomeController extends GetxController {
       }
     }
     return count;
+  }
+
+  Future<void> deletePlant(String documentId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('plants')
+          .doc(documentId)
+          .delete();
+
+      // Remove from local history
+      history.removeWhere((plant) => plant['documentId'] == documentId);
+
+      Get.snackbar(
+        'Success',
+        'Plant record deleted successfully',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      print('Error deleting plant: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to delete plant record',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
 }
