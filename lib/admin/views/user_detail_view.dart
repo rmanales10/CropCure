@@ -49,8 +49,10 @@ class _UserDetailViewState extends State<UserDetailView> {
         userInfo['uid'],
       );
 
+      final isMobile = MediaQuery.of(context).size.width < 768;
+
       return SingleChildScrollView(
-        padding: const EdgeInsets.all(30),
+        padding: EdgeInsets.all(isMobile ? 16 : 30),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -68,7 +70,7 @@ class _UserDetailViewState extends State<UserDetailView> {
                     },
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      padding: const EdgeInsets.all(10),
+                      padding: EdgeInsets.all(isMobile ? 8 : 10),
                       decoration: BoxDecoration(
                         color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(10),
@@ -76,76 +78,109 @@ class _UserDetailViewState extends State<UserDetailView> {
                       child: Icon(
                         Icons.arrow_back_rounded,
                         color: Colors.grey.shade700,
-                        size: 20,
+                        size: isMobile ? 18 : 20,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                _buildProfileImage(userInfo),
-                const SizedBox(width: 16),
+                SizedBox(width: isMobile ? 12 : 16),
+                _buildProfileImage(userInfo, isMobile: isMobile),
+                SizedBox(width: isMobile ? 12 : 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         userInfo['fullname'] ?? 'Unknown User',
-                        style: const TextStyle(
-                          fontSize: 24,
+                        style: TextStyle(
+                          fontSize: isMobile ? 18 : 24,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A1A1A),
+                          color: const Color(0xFF1A1A1A),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: isMobile ? 2 : 4),
                       Text(
                         userInfo['email'] ?? 'N/A',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: isMobile ? 12 : 14,
                           color: Colors.grey.shade600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 30),
+            SizedBox(height: isMobile ? 20 : 30),
             // User Stats Cards
-            Row(
-              children: [
-                Expanded(
-                  child: _buildUserDetailStatCard(
-                    'Total Scans',
-                    userInfo['totalScans']?.toString() ?? '0',
-                    Icons.camera_alt_rounded,
-                    Colors.blue,
-                  ),
+            isMobile
+                ? Column(
+                  children: [
+                    _buildUserDetailStatCard(
+                      'Total Scans',
+                      userInfo['totalScans']?.toString() ?? '0',
+                      Icons.camera_alt_rounded,
+                      Colors.blue,
+                      isMobile: isMobile,
+                    ),
+                    SizedBox(height: isMobile ? 12 : 16),
+                    _buildUserDetailStatCard(
+                      'Diseases Detected',
+                      userInfo['diseaseDetected']?.toString() ?? '0',
+                      Icons.warning_amber_rounded,
+                      Colors.red,
+                      isMobile: isMobile,
+                    ),
+                    SizedBox(height: isMobile ? 12 : 16),
+                    _buildUserDetailStatCard(
+                      'Healthy Plants',
+                      userInfo['healthyScans']?.toString() ?? '0',
+                      Icons.eco_rounded,
+                      Colors.green,
+                      isMobile: isMobile,
+                    ),
+                  ],
+                )
+                : Row(
+                  children: [
+                    Expanded(
+                      child: _buildUserDetailStatCard(
+                        'Total Scans',
+                        userInfo['totalScans']?.toString() ?? '0',
+                        Icons.camera_alt_rounded,
+                        Colors.blue,
+                        isMobile: isMobile,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildUserDetailStatCard(
+                        'Diseases Detected',
+                        userInfo['diseaseDetected']?.toString() ?? '0',
+                        Icons.warning_amber_rounded,
+                        Colors.red,
+                        isMobile: isMobile,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildUserDetailStatCard(
+                        'Healthy Plants',
+                        userInfo['healthyScans']?.toString() ?? '0',
+                        Icons.eco_rounded,
+                        Colors.green,
+                        isMobile: isMobile,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildUserDetailStatCard(
-                    'Diseases Detected',
-                    userInfo['diseaseDetected']?.toString() ?? '0',
-                    Icons.warning_amber_rounded,
-                    Colors.red,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildUserDetailStatCard(
-                    'Healthy Plants',
-                    userInfo['healthyScans']?.toString() ?? '0',
-                    Icons.eco_rounded,
-                    Colors.green,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 30),
+            SizedBox(height: isMobile ? 20 : 30),
             // Disease Distribution Chart
             if (diseaseDistribution.isNotEmpty) ...[
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(isMobile ? 16 : 24),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -175,17 +210,17 @@ class _UserDetailViewState extends State<UserDetailView> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Text(
+                        Text(
                           'Disease Distribution',
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: isMobile ? 16 : 18,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A1A1A),
+                            color: const Color(0xFF1A1A1A),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: isMobile ? 16 : 20),
                     ...(() {
                       // Sort diseases by count (descending) and take top ones
                       final sortedDiseases =
@@ -440,11 +475,11 @@ class _UserDetailViewState extends State<UserDetailView> {
                   ],
                 ),
               ),
-              const SizedBox(height: 30),
+              SizedBox(height: isMobile ? 20 : 30),
             ],
             // Scan History Table
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.all(isMobile ? 16 : 24),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -462,7 +497,7 @@ class _UserDetailViewState extends State<UserDetailView> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: EdgeInsets.all(isMobile ? 6 : 8),
                         decoration: BoxDecoration(
                           color: Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(8),
@@ -470,21 +505,21 @@ class _UserDetailViewState extends State<UserDetailView> {
                         child: Icon(
                           Icons.history_rounded,
                           color: Colors.blue.shade700,
-                          size: 20,
+                          size: isMobile ? 18 : 20,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      const Text(
+                      SizedBox(width: isMobile ? 10 : 12),
+                      Text(
                         'Scan History',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: isMobile ? 16 : 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A1A1A),
+                          color: const Color(0xFF1A1A1A),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: isMobile ? 16 : 20),
                   if (widget.controller.selectedUserHistory.isEmpty)
                     Center(
                       child: Padding(
@@ -513,6 +548,8 @@ class _UserDetailViewState extends State<UserDetailView> {
                       builder: (context, constraints) {
                         final isSmallScreen = constraints.maxWidth < 900;
                         final screenWidth = constraints.maxWidth;
+                        final isMobileScreen =
+                            MediaQuery.of(context).size.width < 768;
 
                         return Container(
                           decoration: BoxDecoration(
@@ -534,15 +571,30 @@ class _UserDetailViewState extends State<UserDetailView> {
                                           : screenWidth - 100,
                                 ),
                                 child: DataTable(
-                                  headingRowHeight: isSmallScreen ? 50 : 56,
-                                  dataRowMinHeight: isSmallScreen ? 50 : 56,
-                                  dataRowMaxHeight: isSmallScreen ? 60 : 68,
+                                  headingRowHeight:
+                                      isMobileScreen
+                                          ? 45
+                                          : (isSmallScreen ? 50 : 56),
+                                  dataRowMinHeight:
+                                      isMobileScreen
+                                          ? 45
+                                          : (isSmallScreen ? 50 : 56),
+                                  dataRowMaxHeight:
+                                      isMobileScreen
+                                          ? 55
+                                          : (isSmallScreen ? 60 : 68),
                                   headingRowColor:
                                       WidgetStateProperty.resolveWith<Color?>(
                                         (states) => const Color(0xFFF9FAFB),
                                       ),
-                                  columnSpacing: isSmallScreen ? 20 : 60,
-                                  horizontalMargin: isSmallScreen ? 20 : 40,
+                                  columnSpacing:
+                                      isMobileScreen
+                                          ? 12
+                                          : (isSmallScreen ? 20 : 60),
+                                  horizontalMargin:
+                                      isMobileScreen
+                                          ? 12
+                                          : (isSmallScreen ? 20 : 40),
                                   dividerThickness: 1,
                                   columns: [
                                     DataColumn(
@@ -551,7 +603,10 @@ class _UserDetailViewState extends State<UserDetailView> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: const Color(0xFF374151),
-                                          fontSize: isSmallScreen ? 13 : 14,
+                                          fontSize:
+                                              isMobileScreen
+                                                  ? 12
+                                                  : (isSmallScreen ? 13 : 14),
                                         ),
                                       ),
                                     ),
@@ -561,7 +616,10 @@ class _UserDetailViewState extends State<UserDetailView> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: const Color(0xFF374151),
-                                          fontSize: isSmallScreen ? 13 : 14,
+                                          fontSize:
+                                              isMobileScreen
+                                                  ? 12
+                                                  : (isSmallScreen ? 13 : 14),
                                         ),
                                       ),
                                     ),
@@ -571,7 +629,10 @@ class _UserDetailViewState extends State<UserDetailView> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: const Color(0xFF374151),
-                                          fontSize: isSmallScreen ? 13 : 14,
+                                          fontSize:
+                                              isMobileScreen
+                                                  ? 12
+                                                  : (isSmallScreen ? 13 : 14),
                                         ),
                                       ),
                                     ),
@@ -581,7 +642,10 @@ class _UserDetailViewState extends State<UserDetailView> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: const Color(0xFF374151),
-                                          fontSize: isSmallScreen ? 13 : 14,
+                                          fontSize:
+                                              isMobileScreen
+                                                  ? 12
+                                                  : (isSmallScreen ? 13 : 14),
                                         ),
                                       ),
                                     ),
@@ -633,9 +697,14 @@ class _UserDetailViewState extends State<UserDetailView> {
                                                         : row['timestamp']
                                                                 ?.toString() ??
                                                             'N/A',
-                                                    style: const TextStyle(
-                                                      fontSize: 14,
-                                                      color: Color(0xFF4B5563),
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          isMobileScreen
+                                                              ? 12
+                                                              : 14,
+                                                      color: const Color(
+                                                        0xFF4B5563,
+                                                      ),
                                                     ),
                                                   ),
                                                 ],
@@ -646,17 +715,28 @@ class _UserDetailViewState extends State<UserDetailView> {
                                                 children: [
                                                   Icon(
                                                     Icons.local_florist_rounded,
-                                                    size: 16,
+                                                    size:
+                                                        isMobileScreen
+                                                            ? 14
+                                                            : 16,
                                                     color:
                                                         Colors.green.shade400,
                                                   ),
-                                                  const SizedBox(width: 8),
+                                                  SizedBox(
+                                                    width:
+                                                        isMobileScreen ? 6 : 8,
+                                                  ),
                                                   Text(
                                                     row['name']?.toString() ??
                                                         'N/A',
-                                                    style: const TextStyle(
-                                                      fontSize: 14,
-                                                      color: Color(0xFF1F2937),
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          isMobileScreen
+                                                              ? 12
+                                                              : 14,
+                                                      color: const Color(
+                                                        0xFF1F2937,
+                                                      ),
                                                       fontWeight:
                                                           FontWeight.w500,
                                                     ),
@@ -700,7 +780,10 @@ class _UserDetailViewState extends State<UserDetailView> {
                                                                 .check_circle_rounded
                                                             : Icons
                                                                 .warning_rounded,
-                                                        size: 16,
+                                                        size:
+                                                            isMobileScreen
+                                                                ? 14
+                                                                : 16,
                                                         color:
                                                             isHealthy
                                                                 ? Colors
@@ -710,14 +793,22 @@ class _UserDetailViewState extends State<UserDetailView> {
                                                                     .red
                                                                     .shade700,
                                                       ),
-                                                      const SizedBox(width: 6),
+                                                      SizedBox(
+                                                        width:
+                                                            isMobileScreen
+                                                                ? 4
+                                                                : 6,
+                                                      ),
                                                       Flexible(
                                                         child: Text(
                                                           row['disease']
                                                                   ?.toString() ??
                                                               'N/A',
                                                           style: TextStyle(
-                                                            fontSize: 13,
+                                                            fontSize:
+                                                                isMobileScreen
+                                                                    ? 11
+                                                                    : 13,
                                                             color:
                                                                 isHealthy
                                                                     ? Colors
@@ -755,14 +846,20 @@ class _UserDetailViewState extends State<UserDetailView> {
                                                             Icon(
                                                               Icons
                                                                   .health_and_safety_rounded,
-                                                              size: 16,
+                                                              size:
+                                                                  isMobileScreen
+                                                                      ? 14
+                                                                      : 16,
                                                               color:
                                                                   Colors
                                                                       .grey
                                                                       .shade400,
                                                             ),
-                                                            const SizedBox(
-                                                              width: 6,
+                                                            SizedBox(
+                                                              width:
+                                                                  isMobileScreen
+                                                                      ? 4
+                                                                      : 6,
                                                             ),
                                                             Flexible(
                                                               child: Text(
@@ -772,7 +869,10 @@ class _UserDetailViewState extends State<UserDetailView> {
                                                                       Colors
                                                                           .grey
                                                                           .shade600,
-                                                                  fontSize: 13,
+                                                                  fontSize:
+                                                                      isMobileScreen
+                                                                          ? 11
+                                                                          : 13,
                                                                   fontStyle:
                                                                       FontStyle
                                                                           .italic,
@@ -819,7 +919,7 @@ class _UserDetailViewState extends State<UserDetailView> {
                                                                       8,
                                                                     ),
                                                               ),
-                                                              child: const Row(
+                                                              child: Row(
                                                                 mainAxisSize:
                                                                     MainAxisSize
                                                                         .min,
@@ -830,10 +930,16 @@ class _UserDetailViewState extends State<UserDetailView> {
                                                                     color:
                                                                         Colors
                                                                             .white,
-                                                                    size: 16,
+                                                                    size:
+                                                                        isMobileScreen
+                                                                            ? 14
+                                                                            : 16,
                                                                   ),
                                                                   SizedBox(
-                                                                    width: 6,
+                                                                    width:
+                                                                        isMobileScreen
+                                                                            ? 4
+                                                                            : 6,
                                                                   ),
                                                                   Text(
                                                                     'View Treatment',
@@ -842,7 +948,9 @@ class _UserDetailViewState extends State<UserDetailView> {
                                                                           Colors
                                                                               .white,
                                                                       fontSize:
-                                                                          13,
+                                                                          isMobileScreen
+                                                                              ? 11.0
+                                                                              : 13.0,
                                                                       fontWeight:
                                                                           FontWeight
                                                                               .w600,
@@ -891,13 +999,17 @@ class _UserDetailViewState extends State<UserDetailView> {
   }
 
   Widget _buildPaginationControls() {
+    final isMobile = MediaQuery.of(context).size.width < 768;
     final totalPages = _getTotalPages();
     final totalItems = widget.controller.selectedUserHistory.length;
     final startItem = totalItems == 0 ? 0 : (_currentPage * _itemsPerPage) + 1;
     final endItem = ((_currentPage + 1) * _itemsPerPage).clamp(0, totalItems);
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+      padding: EdgeInsets.symmetric(
+        vertical: isMobile ? 12 : 16,
+        horizontal: isMobile ? 4 : 8,
+      ),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(12),
@@ -912,164 +1024,326 @@ class _UserDetailViewState extends State<UserDetailView> {
                 ? 'No items'
                 : 'Showing ${startItem}-${endItem} of $totalItems',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: isMobile ? 11 : 13,
               color: Colors.grey.shade600,
               fontWeight: FontWeight.w500,
             ),
           ),
           // Pagination buttons
-          Row(
-            children: [
-              // Previous button
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap:
-                      _currentPage > 0
-                          ? () {
-                            setState(() {
-                              _currentPage--;
-                            });
-                          }
-                          : null,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          _currentPage > 0
-                              ? Colors.blue.shade600
-                              : Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow:
-                          _currentPage > 0
-                              ? [
-                                BoxShadow(
-                                  color: Colors.blue.withOpacity(0.2),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
+          isMobile
+              ? Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Previous button
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap:
+                              _currentPage > 0
+                                  ? () {
+                                    setState(() {
+                                      _currentPage--;
+                                    });
+                                  }
+                                  : null,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  _currentPage > 0
+                                      ? Colors.blue.shade600
+                                      : Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow:
+                                  _currentPage > 0
+                                      ? [
+                                        BoxShadow(
+                                          color: Colors.blue.withOpacity(0.2),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                      : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.chevron_left_rounded,
+                                  color:
+                                      _currentPage > 0
+                                          ? Colors.white
+                                          : Colors.grey.shade600,
+                                  size: isMobile ? 18 : 20,
                                 ),
-                              ]
+                                SizedBox(width: isMobile ? 2 : 4),
+                                Text(
+                                  'Prev',
+                                  style: TextStyle(
+                                    color:
+                                        _currentPage > 0
+                                            ? Colors.white
+                                            : Colors.grey.shade600,
+                                    fontSize: isMobile ? 11 : 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: isMobile ? 8 : 12),
+                      // Page indicator
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isMobile ? 12 : 16,
+                          vertical: isMobile ? 8 : 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          'Page ${_currentPage + 1} of ${totalPages}',
+                          style: TextStyle(
+                            fontSize: isMobile ? 11 : 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: isMobile ? 8 : 12),
+                      // Next button
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap:
+                              _currentPage < totalPages - 1
+                                  ? () {
+                                    setState(() {
+                                      _currentPage++;
+                                    });
+                                  }
+                                  : null,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  _currentPage < totalPages - 1
+                                      ? Colors.blue.shade600
+                                      : Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow:
+                                  _currentPage < totalPages - 1
+                                      ? [
+                                        BoxShadow(
+                                          color: Colors.blue.withOpacity(0.2),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                      : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Next',
+                                  style: TextStyle(
+                                    color:
+                                        _currentPage < totalPages - 1
+                                            ? Colors.white
+                                            : Colors.grey.shade600,
+                                    fontSize: isMobile ? 11 : 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(width: isMobile ? 2 : 4),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  color:
+                                      _currentPage < totalPages - 1
+                                          ? Colors.white
+                                          : Colors.grey.shade600,
+                                  size: isMobile ? 18 : 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: isMobile ? 8 : 0),
+                ],
+              )
+              : Row(
+                children: [
+                  // Previous button
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap:
+                          _currentPage > 0
+                              ? () {
+                                setState(() {
+                                  _currentPage--;
+                                });
+                              }
                               : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.chevron_left_rounded,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
                           color:
                               _currentPage > 0
-                                  ? Colors.white
-                                  : Colors.grey.shade600,
-                          size: 20,
+                                  ? Colors.blue.shade600
+                                  : Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow:
+                              _currentPage > 0
+                                  ? [
+                                    BoxShadow(
+                                      color: Colors.blue.withOpacity(0.2),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                  : null,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Prev',
-                          style: TextStyle(
-                            color:
-                                _currentPage > 0
-                                    ? Colors.white
-                                    : Colors.grey.shade600,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.chevron_left_rounded,
+                              color:
+                                  _currentPage > 0
+                                      ? Colors.white
+                                      : Colors.grey.shade600,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Prev',
+                              style: TextStyle(
+                                color:
+                                    _currentPage > 0
+                                        ? Colors.white
+                                        : Colors.grey.shade600,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Page indicator
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300, width: 1),
-                ),
-                child: Text(
-                  'Page ${_currentPage + 1} of ${totalPages}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Next button
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap:
-                      _currentPage < totalPages - 1
-                          ? () {
-                            setState(() {
-                              _currentPage++;
-                            });
-                          }
-                          : null,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
+                  const SizedBox(width: 12),
+                  // Page indicator
+                  Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color:
-                          _currentPage < totalPages - 1
-                              ? Colors.blue.shade600
-                              : Colors.grey.shade300,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
-                      boxShadow:
-                          _currentPage < totalPages - 1
-                              ? [
-                                BoxShadow(
-                                  color: Colors.blue.withOpacity(0.2),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                              : null,
+                      border: Border.all(color: Colors.grey.shade300, width: 1),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Next',
-                          style: TextStyle(
-                            color:
-                                _currentPage < totalPages - 1
-                                    ? Colors.white
-                                    : Colors.grey.shade600,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color:
-                              _currentPage < totalPages - 1
-                                  ? Colors.white
-                                  : Colors.grey.shade600,
-                          size: 20,
-                        ),
-                      ],
+                    child: Text(
+                      'Page ${_currentPage + 1} of ${totalPages}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade700,
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  // Next button
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap:
+                          _currentPage < totalPages - 1
+                              ? () {
+                                setState(() {
+                                  _currentPage++;
+                                });
+                              }
+                              : null,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              _currentPage < totalPages - 1
+                                  ? Colors.blue.shade600
+                                  : Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow:
+                              _currentPage < totalPages - 1
+                                  ? [
+                                    BoxShadow(
+                                      color: Colors.blue.withOpacity(0.2),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                  : null,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Next',
+                              style: TextStyle(
+                                color:
+                                    _currentPage < totalPages - 1
+                                        ? Colors.white
+                                        : Colors.grey.shade600,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color:
+                                  _currentPage < totalPages - 1
+                                      ? Colors.white
+                                      : Colors.grey.shade600,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
         ],
       ),
     );
@@ -1079,10 +1353,11 @@ class _UserDetailViewState extends State<UserDetailView> {
     String title,
     String value,
     IconData icon,
-    Color color,
-  ) {
+    Color color, {
+    bool isMobile = false,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1097,7 +1372,7 @@ class _UserDetailViewState extends State<UserDetailView> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isMobile ? 12 : 16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -1122,9 +1397,9 @@ class _UserDetailViewState extends State<UserDetailView> {
                 ),
               ],
             ),
-            child: Icon(icon, color: Colors.white, size: 32),
+            child: Icon(icon, color: Colors.white, size: isMobile ? 24 : 32),
           ),
-          const SizedBox(width: 20),
+          SizedBox(width: isMobile ? 12 : 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1132,18 +1407,18 @@ class _UserDetailViewState extends State<UserDetailView> {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: isMobile ? 12 : 14,
                     fontWeight: FontWeight.w500,
                     color: Colors.grey.shade600,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: isMobile ? 4 : 8),
                 Text(
                   value,
-                  style: const TextStyle(
-                    fontSize: 32,
+                  style: TextStyle(
+                    fontSize: isMobile ? 24 : 32,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
+                    color: const Color(0xFF1A1A1A),
                   ),
                 ),
               ],
@@ -1354,7 +1629,13 @@ class _UserDetailViewState extends State<UserDetailView> {
     );
   }
 
-  Widget _buildProfileImage(Map<String, dynamic> userInfo) {
+  Widget _buildProfileImage(
+    Map<String, dynamic> userInfo, {
+    bool isMobile = false,
+  }) {
+    final size = isMobile ? 40.0 : 48.0;
+    final iconSize = isMobile ? 20.0 : 24.0;
+
     try {
       final base64Image = userInfo['base64image'];
       if (base64Image != null && base64Image.toString().trim().isNotEmpty) {
@@ -1387,23 +1668,23 @@ class _UserDetailViewState extends State<UserDetailView> {
             borderRadius: BorderRadius.circular(10),
             child: Image.memory(
               imageBytes,
-              width: 48,
-              height: 48,
+              width: size,
+              height: size,
               fit: BoxFit.cover,
               gaplessPlayback: true,
               errorBuilder: (context, error, stackTrace) {
                 // If image fails to load, show default icon
                 return Container(
-                  width: 48,
-                  height: 48,
+                  width: size,
+                  height: size,
                   decoration: BoxDecoration(
                     color: Colors.green.shade700,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.person_rounded,
                     color: Colors.white,
-                    size: 24,
+                    size: iconSize,
                   ),
                 );
               },
@@ -1418,7 +1699,7 @@ class _UserDetailViewState extends State<UserDetailView> {
 
     // Default icon fallback
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(isMobile ? 10 : 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Colors.green.shade400, Colors.green.shade600],
@@ -1427,7 +1708,7 @@ class _UserDetailViewState extends State<UserDetailView> {
         ),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Icon(Icons.person_rounded, color: Colors.white, size: 24),
+      child: Icon(Icons.person_rounded, color: Colors.white, size: iconSize),
     );
   }
 

@@ -64,8 +64,9 @@ class _UserHistoryViewState extends State<UserHistoryView> {
   }
 
   Widget _buildUserList() {
+    final isMobile = MediaQuery.of(context).size.width < 768;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(30),
+      padding: EdgeInsets.all(isMobile ? 16 : 30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -73,7 +74,7 @@ class _UserHistoryViewState extends State<UserHistoryView> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(isMobile ? 10 : 12),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Colors.blue.shade400, Colors.blue.shade600],
@@ -89,35 +90,42 @@ class _UserHistoryViewState extends State<UserHistoryView> {
                     ),
                   ],
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.people_rounded,
                   color: Colors.white,
-                  size: 28,
+                  size: isMobile ? 24 : 28,
                 ),
               ),
-              const SizedBox(width: 16),
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'User Scan History',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A),
-                      letterSpacing: -0.5,
+              SizedBox(width: isMobile ? 12 : 16),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'User Scan History',
+                      style: TextStyle(
+                        fontSize: isMobile ? 20 : 26,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1A1A1A),
+                        letterSpacing: -0.5,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'View individual user scan statistics',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-                  ),
-                ],
+                    if (!isMobile) ...[
+                      const SizedBox(height: 2),
+                      const Text(
+                        'View individual user scan statistics',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 30),
+          SizedBox(height: isMobile ? 20 : 30),
           // Search Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -156,7 +164,7 @@ class _UserHistoryViewState extends State<UserHistoryView> {
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: isMobile ? 16 : 24),
           // Users List - Optimized with ListView.builder
           Obx(() {
             // Compute filtered users here to access reactive list

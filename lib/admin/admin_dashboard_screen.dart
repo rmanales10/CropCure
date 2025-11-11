@@ -29,6 +29,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   static const int _scanHistoryItemsPerPage = 5;
   DateTime? _startDate;
   DateTime? _endDate;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Helper function to check if a plant is healthy - uses controller's method
   bool _isPlantHealthy(String? disease) {
@@ -568,7 +569,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               child: Container(
                 padding: const EdgeInsets.all(24),
-                constraints: const BoxConstraints(maxWidth: 500),
+                constraints: BoxConstraints(
+                  maxWidth:
+                      MediaQuery.of(context).size.width < 768
+                          ? MediaQuery.of(context).size.width - 32
+                          : 500,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -999,21 +1005,148 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 768;
+
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFFF8FAFB),
+      drawer: isMobile ? _buildMobileDrawer() : null,
       body: Row(
         children: [
-          // Left Sidebar
-          _buildLeftSidebar(),
+          // Left Sidebar (hidden on mobile, shown as drawer)
+          if (!isMobile) _buildLeftSidebar(),
           // Main Content
           Expanded(
             child: Column(
               children: [
                 // AppBar
-                _buildAppBar(),
+                _buildAppBar(isMobile: isMobile),
                 // Body Content
                 Expanded(child: _buildMainContent()),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileDrawer() {
+    return Drawer(
+      width: 280,
+      backgroundColor: Colors.white,
+      child: Column(
+        children: [
+          // Sidebar Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.green.shade400, Colors.green.shade700],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.admin_panel_settings_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Admin',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          height: 1.0,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'Dashboard',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white70,
+                          height: 1.0,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Navigation Items
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              children: [
+                _buildNavItem(
+                  icon: Icons.dashboard_rounded,
+                  label: 'Dashboard',
+                  isSelected: _selectedNavItem == 0,
+                  onTap: () {
+                    setState(() => _selectedNavItem = 0);
+                    Navigator.of(context).pop();
+                  },
+                ),
+                _buildNavItem(
+                  icon: Icons.people_rounded,
+                  label: 'User History',
+                  isSelected: _selectedNavItem == 3,
+                  onTap: () {
+                    setState(() => _selectedNavItem = 3);
+                    Navigator.of(context).pop();
+                  },
+                ),
+                const Divider(height: 32),
+                _buildNavItem(
+                  icon: Icons.picture_as_pdf_rounded,
+                  label: 'Generate Reports',
+                  isSelected: false,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showExportOptionsDialog();
+                  },
+                ),
+              ],
+            ),
+          ),
+          // Logout Button
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: Colors.grey.shade200, width: 1),
+              ),
+            ),
+            child: _buildNavItem(
+              icon: Icons.logout_rounded,
+              label: 'Logout',
+              isSelected: false,
+              onTap: () {
+                Navigator.of(context).pop();
+                _showLogoutDialog();
+              },
+              isLogout: true,
             ),
           ),
         ],
@@ -1256,25 +1389,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ? Colors.red.shade700
                             : Colors.grey.shade600),
               ),
-              if (!_isSidebarCollapsed) ...[
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w500,
-                      color:
-                          isSelected
-                              ? Colors.green.shade700
-                              : (isLogout
-                                  ? Colors.red.shade700
-                                  : Colors.grey.shade700),
-                    ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    color:
+                        isSelected
+                            ? Colors.green.shade700
+                            : (isLogout
+                                ? Colors.red.shade700
+                                : Colors.grey.shade700),
                   ),
                 ),
-              ],
+              ),
             ],
           ),
         ),
@@ -1282,15 +1412,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildAppBar() {
+  Widget _buildAppBar({bool isMobile = false}) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 30,
+        vertical: isMobile ? 12 : 16,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Hamburger menu for mobile
+          if (isMobile)
+            IconButton(
+              icon: const Icon(Icons.menu_rounded),
+              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+              color: Colors.grey.shade700,
+            ),
+          if (isMobile) const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(isMobile ? 10 : 12),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [Colors.green.shade400, Colors.green.shade700],
@@ -1306,43 +1447,45 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
               ],
             ),
-            child: const Icon(
+            child: Icon(
               Icons.analytics_outlined,
               color: Colors.white,
-              size: 28,
+              size: isMobile ? 24 : 28,
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: isMobile ? 12 : 16),
           Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   'Analytics Dashboard',
                   style: TextStyle(
-                    fontSize: 26,
+                    fontSize: isMobile ? 20 : 26,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
+                    color: const Color(0xFF1A1A1A),
                     letterSpacing: -0.5,
                     height: 1.0,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 1),
-                const Text(
-                  'Monitor disease scans and trends',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.normal,
-                    color: Color(0xFF6B7280),
-                    height: 1.0,
+                if (!isMobile) ...[
+                  const SizedBox(height: 1),
+                  const Text(
+                    'Monitor disease scans and trends',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.normal,
+                      color: Color(0xFF6B7280),
+                      height: 1.0,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                ],
               ],
             ),
           ),
@@ -1371,16 +1514,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildDashboardView() {
+    final isMobile = MediaQuery.of(context).size.width < 768;
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 30),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 40,
+        vertical: isMobile ? 16 : 30,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Date Range Filter
           _buildDateRangeFilter(),
-          const SizedBox(height: 20),
+          SizedBox(height: isMobile ? 16 : 20),
           _buildStatsCards(),
-          const SizedBox(height: 30),
+          SizedBox(height: isMobile ? 20 : 30),
           diseaseScanAndHistoryCard(),
         ],
       ),
@@ -1388,8 +1535,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildDateRangeFilter() {
+    final isMobile = MediaQuery.of(context).size.width < 768;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1401,101 +1549,211 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.green.shade400, Colors.green.shade600],
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.filter_list_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Date Range Filter',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
+      child:
+          isMobile
+              ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.green.shade400,
+                              Colors.green.shade600,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.filter_list_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Date Range Filter',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A1A1A),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _startDate != null && _endDate != null
-                      ? '${DateFormat('MMM dd, yyyy').format(_startDate!)} - ${DateFormat('MMM dd, yyyy').format(_endDate!)}'
-                      : 'All time (no filter applied)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color:
-                        _startDate != null && _endDate != null
-                            ? Colors.green.shade700
-                            : Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
+                  const SizedBox(height: 12),
+                  Text(
+                    _startDate != null && _endDate != null
+                        ? '${DateFormat('MMM dd, yyyy').format(_startDate!)} - ${DateFormat('MMM dd, yyyy').format(_endDate!)}'
+                        : 'All time (no filter applied)',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color:
+                          _startDate != null && _endDate != null
+                              ? Colors.green.shade700
+                              : Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Filter Button
-          ElevatedButton.icon(
-            onPressed: _showDateRangePicker,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade700,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _showDateRangePicker,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 2,
+                          ),
+                          icon: const Icon(Icons.date_range_rounded, size: 18),
+                          label: const Text(
+                            'Select Dates',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (_startDate != null || _endDate != null) ...[
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _startDate = null;
+                              _endDate = null;
+                              _scanHistoryPage = 0;
+                            });
+                          },
+                          icon: Icon(
+                            Icons.clear_rounded,
+                            color: Colors.red.shade600,
+                          ),
+                          tooltip: 'Clear filter',
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              )
+              : Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.green.shade400, Colors.green.shade600],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.filter_list_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Date Range Filter',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A1A1A),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _startDate != null && _endDate != null
+                              ? '${DateFormat('MMM dd, yyyy').format(_startDate!)} - ${DateFormat('MMM dd, yyyy').format(_endDate!)}'
+                              : 'All time (no filter applied)',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color:
+                                _startDate != null && _endDate != null
+                                    ? Colors.green.shade700
+                                    : Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Filter Button
+                  ElevatedButton.icon(
+                    onPressed: _showDateRangePicker,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 2,
+                    ),
+                    icon: const Icon(Icons.date_range_rounded, size: 20),
+                    label: const Text(
+                      'Select Dates',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (_startDate != null || _endDate != null) ...[
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _startDate = null;
+                          _endDate = null;
+                          _scanHistoryPage = 0;
+                        });
+                      },
+                      icon: Icon(
+                        Icons.clear_rounded,
+                        color: Colors.red.shade600,
+                      ),
+                      tooltip: 'Clear filter',
+                    ),
+                  ],
+                ],
               ),
-              elevation: 2,
-            ),
-            icon: const Icon(Icons.date_range_rounded, size: 20),
-            label: const Text(
-              'Select Dates',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-            ),
-          ),
-          if (_startDate != null || _endDate != null) ...[
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: () {
-                setState(() {
-                  _startDate = null;
-                  _endDate = null;
-                  _scanHistoryPage =
-                      0; // Reset to first page when filter is cleared
-                });
-              },
-              icon: Icon(Icons.clear_rounded, color: Colors.red.shade600),
-              tooltip: 'Clear filter',
-            ),
-          ],
-        ],
-      ),
     );
   }
 
   Widget _buildInsightsView() {
+    final isMobile = MediaQuery.of(context).size.width < 768;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(30),
+      padding: EdgeInsets.all(isMobile ? 16 : 30),
       child: _buildInsightsTab(),
     );
   }
 
   Widget _buildTrendsView() {
+    final isMobile = MediaQuery.of(context).size.width < 768;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(30),
+      padding: EdgeInsets.all(isMobile ? 16 : 30),
       child: _buildTrendsTab(),
     );
   }
@@ -2216,11 +2474,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
       return LayoutBuilder(
         builder: (context, constraints) {
+          final isMobile = MediaQuery.of(context).size.width < 768;
           final isSmallScreen = constraints.maxWidth < 900;
 
           return Wrap(
-            spacing: 20,
-            runSpacing: 20,
+            spacing: isMobile ? 12 : 20,
+            runSpacing: isMobile ? 12 : 20,
             children: [
               _buildStatCard(
                 title: 'Total Scans',
@@ -2232,9 +2491,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   end: Alignment.bottomRight,
                 ),
                 width:
-                    isSmallScreen
+                    isMobile || isSmallScreen
                         ? constraints.maxWidth
                         : (constraints.maxWidth - 40) / 3,
+                isMobile: isMobile,
               ),
               _buildStatCard(
                 title: 'Diseases Detected',
@@ -2246,9 +2506,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   end: Alignment.bottomRight,
                 ),
                 width:
-                    isSmallScreen
+                    isMobile || isSmallScreen
                         ? constraints.maxWidth
                         : (constraints.maxWidth - 40) / 3,
+                isMobile: isMobile,
               ),
               _buildStatCard(
                 title: 'Healthy Plants',
@@ -2260,9 +2521,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   end: Alignment.bottomRight,
                 ),
                 width:
-                    isSmallScreen
+                    isMobile || isSmallScreen
                         ? constraints.maxWidth
                         : (constraints.maxWidth - 40) / 3,
+                isMobile: isMobile,
               ),
             ],
           );
@@ -2277,10 +2539,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     required IconData icon,
     required Gradient gradient,
     required double width,
+    bool isMobile = false,
   }) {
     return Container(
       width: width,
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -2295,7 +2558,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isMobile ? 12 : 16),
             decoration: BoxDecoration(
               gradient: gradient,
               borderRadius: BorderRadius.circular(12),
@@ -2307,9 +2570,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
               ],
             ),
-            child: Icon(icon, color: Colors.white, size: 32),
+            child: Icon(icon, color: Colors.white, size: isMobile ? 24 : 32),
           ),
-          const SizedBox(width: 20),
+          SizedBox(width: isMobile ? 12 : 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2317,18 +2580,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: isMobile ? 12 : 14,
                     fontWeight: FontWeight.w500,
                     color: Colors.grey.shade600,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: isMobile ? 4 : 8),
                 Text(
                   value,
-                  style: const TextStyle(
-                    fontSize: 32,
+                  style: TextStyle(
+                    fontSize: isMobile ? 24 : 32,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
+                    color: const Color(0xFF1A1A1A),
                   ),
                 ),
               ],
@@ -2345,6 +2608,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         // Calculate responsive dimensions
         final screenWidth = constraints.maxWidth;
         final isSmallScreen = screenWidth < 800;
+        final isMobileScreen = MediaQuery.of(context).size.width < 768;
 
         return Container(
           decoration: BoxDecoration(
@@ -2730,9 +2994,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     : screenWidth - 100,
                           ),
                           child: DataTable(
-                            headingRowHeight: isSmallScreen ? 50 : 56,
-                            dataRowMinHeight: isSmallScreen ? 50 : 56,
-                            dataRowMaxHeight: isSmallScreen ? 60 : 68,
+                            headingRowHeight:
+                                isMobileScreen ? 45 : (isSmallScreen ? 50 : 56),
+                            dataRowMinHeight:
+                                isMobileScreen ? 45 : (isSmallScreen ? 50 : 56),
+                            dataRowMaxHeight:
+                                isMobileScreen ? 55 : (isSmallScreen ? 60 : 68),
                             headingRowColor:
                                 WidgetStateProperty.resolveWith<Color?>(
                                   (states) => const Color(0xFFF9FAFB),
@@ -3286,7 +3553,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxHeight: MediaQuery.of(context).size.height * 0.8,
-                maxWidth: 500,
+                maxWidth:
+                    MediaQuery.of(context).size.width < 768
+                        ? MediaQuery.of(context).size.width - 32
+                        : 500,
               ),
               child: SingleChildScrollView(
                 child: Column(

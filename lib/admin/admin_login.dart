@@ -49,6 +49,8 @@ class _AdminLoginState extends State<AdminLogin> {
 
   // Error dialog
   void _showErrorDialog(String title, String message) {
+    final isMobile = MediaQuery.of(context).size.width < 768;
+
     showDialog(
       context: context,
       builder: (context) {
@@ -59,7 +61,10 @@ class _AdminLoginState extends State<AdminLogin> {
           elevation: 0,
           backgroundColor: Colors.transparent,
           child: Container(
-            padding: const EdgeInsets.all(24),
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? MediaQuery.of(context).size.width - 32 : 400,
+            ),
+            padding: EdgeInsets.all(isMobile ? 20 : 24),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
@@ -75,7 +80,7 @@ class _AdminLoginState extends State<AdminLogin> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(isMobile ? 12 : 16),
                   decoration: BoxDecoration(
                     color: Colors.red.shade50,
                     shape: BoxShape.circle,
@@ -83,28 +88,28 @@ class _AdminLoginState extends State<AdminLogin> {
                   child: Icon(
                     Icons.error_outline_rounded,
                     color: Colors.red.shade700,
-                    size: 40,
+                    size: isMobile ? 32 : 40,
                   ),
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: isMobile ? 16 : 20),
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 22,
+                  style: TextStyle(
+                    fontSize: isMobile ? 18 : 22,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
+                    color: const Color(0xFF1A1A1A),
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: isMobile ? 10 : 12),
                 Text(
                   message,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: Color(0xFF6B7280),
+                  style: TextStyle(
+                    fontSize: isMobile ? 13 : 15,
+                    color: const Color(0xFF6B7280),
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: isMobile ? 20 : 24),
                 SizedBox(
                   width: double.infinity,
                   child: Container(
@@ -126,16 +131,18 @@ class _AdminLoginState extends State<AdminLogin> {
                     child: TextButton(
                       onPressed: () => Navigator.of(context).pop(),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: EdgeInsets.symmetric(
+                          vertical: isMobile ? 14 : 16,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         'OK',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: isMobile ? 14 : 16,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -152,6 +159,8 @@ class _AdminLoginState extends State<AdminLogin> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 768;
+
     return Scaffold(
       body: Stack(
         children: [
@@ -178,9 +187,14 @@ class _AdminLoginState extends State<AdminLogin> {
           Center(
             child: SingleChildScrollView(
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 480),
-                margin: const EdgeInsets.symmetric(horizontal: 24),
-                padding: const EdgeInsets.all(40),
+                constraints: BoxConstraints(
+                  maxWidth: isMobile ? double.infinity : 480,
+                ),
+                margin: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 16 : 24,
+                  vertical: isMobile ? 16 : 0,
+                ),
+                padding: EdgeInsets.all(isMobile ? 24 : 40),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24),
@@ -197,7 +211,7 @@ class _AdminLoginState extends State<AdminLogin> {
                   children: [
                     // Logo/Icon
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.all(isMobile ? 16 : 20),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -216,32 +230,33 @@ class _AdminLoginState extends State<AdminLogin> {
                           ),
                         ],
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.admin_panel_settings_rounded,
-                        size: 48,
+                        size: isMobile ? 40 : 48,
                         color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 28),
+                    SizedBox(height: isMobile ? 20 : 28),
                     // Title
-                    const Text(
+                    Text(
                       "Admin Portal",
                       style: TextStyle(
-                        fontSize: 32,
+                        fontSize: isMobile ? 26 : 32,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1A1A),
+                        color: const Color(0xFF1A1A1A),
                         letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: isMobile ? 6 : 8),
                     Text(
                       "Sign in to access your dashboard",
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: isMobile ? 13 : 15,
                         color: Colors.grey.shade600,
                       ),
+                      textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 36),
+                    SizedBox(height: isMobile ? 28 : 36),
                     // Username Field
                     _buildModernInputField(
                       controller: _emailController,
@@ -249,8 +264,9 @@ class _AdminLoginState extends State<AdminLogin> {
                       hintText: "Enter your username",
                       icon: Icons.person_rounded,
                       isPassword: false,
+                      isMobile: isMobile,
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: isMobile ? 16 : 20),
                     // Password Field
                     _buildModernInputField(
                       controller: _passwordController,
@@ -258,12 +274,13 @@ class _AdminLoginState extends State<AdminLogin> {
                       hintText: "Enter your password",
                       icon: Icons.lock_rounded,
                       isPassword: true,
+                      isMobile: isMobile,
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: isMobile ? 24 : 32),
                     // Login Button
                     SizedBox(
                       width: double.infinity,
-                      height: 56,
+                      height: isMobile ? 50 : 56,
                       child: Container(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
@@ -304,33 +321,33 @@ class _AdminLoginState extends State<AdminLogin> {
                                       ),
                                     ),
                                   )
-                                  : const Row(
+                                  : Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
                                         "Sign In",
                                         style: TextStyle(
-                                          fontSize: 18,
+                                          fontSize: isMobile ? 16 : 18,
                                           fontWeight: FontWeight.w600,
                                           color: Colors.white,
                                           letterSpacing: 0.5,
                                         ),
                                       ),
-                                      SizedBox(width: 8),
+                                      SizedBox(width: isMobile ? 6 : 8),
                                       Icon(
                                         Icons.arrow_forward_rounded,
                                         color: Colors.white,
-                                        size: 20,
+                                        size: isMobile ? 18 : 20,
                                       ),
                                     ],
                                   ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: isMobile ? 20 : 24),
                     // Info text
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.all(isMobile ? 12 : 16),
                       decoration: BoxDecoration(
                         color: Colors.blue.shade50,
                         borderRadius: BorderRadius.circular(12),
@@ -344,14 +361,14 @@ class _AdminLoginState extends State<AdminLogin> {
                           Icon(
                             Icons.info_outline_rounded,
                             color: Colors.blue.shade700,
-                            size: 20,
+                            size: isMobile ? 18 : 20,
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: isMobile ? 10 : 12),
                           Expanded(
                             child: Text(
                               "Use admin credentials to access",
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: isMobile ? 12 : 13,
                                 color: Colors.blue.shade900,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -376,20 +393,21 @@ class _AdminLoginState extends State<AdminLogin> {
     required String hintText,
     required IconData icon,
     required bool isPassword,
+    bool isMobile = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
+          style: TextStyle(
+            fontSize: isMobile ? 13 : 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF374151),
+            color: const Color(0xFF374151),
             letterSpacing: 0.2,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: isMobile ? 6 : 8),
         Container(
           decoration: BoxDecoration(
             color: Colors.grey.shade50,
@@ -399,21 +417,25 @@ class _AdminLoginState extends State<AdminLogin> {
           child: TextField(
             controller: controller,
             obscureText: isPassword && !_isPasswordVisible,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Color(0xFF1A1A1A),
+            style: TextStyle(
+              fontSize: isMobile ? 15 : 16,
+              color: const Color(0xFF1A1A1A),
               fontWeight: FontWeight.w500,
             ),
             decoration: InputDecoration(
               hintText: hintText,
               hintStyle: TextStyle(
                 color: Colors.grey.shade400,
-                fontSize: 15,
+                fontSize: isMobile ? 14 : 15,
                 fontWeight: FontWeight.normal,
               ),
               prefixIcon: Container(
-                margin: const EdgeInsets.only(right: 12),
-                child: Icon(icon, color: Colors.green.shade600, size: 22),
+                margin: EdgeInsets.only(right: isMobile ? 8 : 12),
+                child: Icon(
+                  icon,
+                  color: Colors.green.shade600,
+                  size: isMobile ? 20 : 22,
+                ),
               ),
               suffixIcon:
                   isPassword
@@ -423,7 +445,7 @@ class _AdminLoginState extends State<AdminLogin> {
                               ? Icons.visibility_rounded
                               : Icons.visibility_off_rounded,
                           color: Colors.grey.shade600,
-                          size: 22,
+                          size: isMobile ? 20 : 22,
                         ),
                         onPressed: () {
                           setState(() {
@@ -433,9 +455,9 @@ class _AdminLoginState extends State<AdminLogin> {
                       )
                       : null,
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 12 : 16,
+                vertical: isMobile ? 14 : 16,
               ),
             ),
           ),
