@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -9,41 +11,95 @@ class AdminLogin extends StatefulWidget {
 }
 
 class _AdminLoginState extends State<AdminLogin> {
+  final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
-  void _login() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showErrorDialog('All fields are required', 'Please fill in all fields');
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
     setState(() => _isLoading = true);
 
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
 
-    setState(() => _isLoading = false);
+      // Sign in with Firebase Auth
+      final UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
 
-    if (_emailController.text == 'admin' &&
-        _passwordController.text == 'admin') {
-      Get.offAllNamed('/dashboard');
-      Get.snackbar(
-        'Success',
-        'Welcome back, Admin!',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.green.shade600,
-        colorText: Colors.white,
-        icon: const Icon(Icons.check_circle, color: Colors.white),
-        duration: const Duration(seconds: 2),
-      );
-    } else {
+      final user = userCredential.user;
+      if (user != null) {
+        // Check if user exists in admins collection
+        final adminDoc =
+            await FirebaseFirestore.instance
+                .collection('admins')
+                .doc(user.uid)
+                .get();
+
+        if (!adminDoc.exists) {
+          // User is authenticated but not an admin
+          await FirebaseAuth.instance.signOut();
+          _showErrorDialog(
+            'Access Denied',
+            'You do not have admin privileges. Please contact the administrator.',
+          );
+          return;
+        }
+
+        // Update last login timestamp
+        await FirebaseFirestore.instance
+            .collection('admins')
+            .doc(user.uid)
+            .update({'updatedAt': FieldValue.serverTimestamp()});
+
+        // Success - navigate to dashboard
+        Get.offAllNamed('/dashboard');
+        Get.snackbar(
+          'Success',
+          'Welcome back, ${adminDoc.data()?['fullname'] ?? 'Admin'}!',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.green.shade600,
+          colorText: Colors.white,
+          icon: const Icon(Icons.check_circle, color: Colors.white),
+          duration: const Duration(seconds: 2),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = 'Login failed';
+      if (e.code == 'user-not-found') {
+        errorMessage = 'No account found with this email.';
+      } else if (e.code == 'wrong-password') {
+        errorMessage = 'Incorrect password. Please try again.';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'The email address is invalid.';
+      } else if (e.code == 'user-disabled') {
+        errorMessage = 'This account has been disabled.';
+      } else if (e.code == 'too-many-requests') {
+        errorMessage =
+            'Too many failed login attempts. Please try again later.';
+      } else {
+        errorMessage = e.message ?? 'Login failed. Please try again.';
+      }
+      _showErrorDialog('Login Error', errorMessage);
+    } catch (e) {
       _showErrorDialog(
-        'Invalid Credentials',
-        'Username or password is incorrect',
+        'Error',
+        'An unexpected error occurred: ${e.toString()}',
       );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -206,178 +262,168 @@ class _AdminLoginState extends State<AdminLogin> {
                     ),
                   ],
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Logo/Icon
-                    Container(
-                      padding: EdgeInsets.all(isMobile ? 16 : 20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.green.shade400,
-                            Colors.green.shade700,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.green.withOpacity(0.3),
-                            blurRadius: 15,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.admin_panel_settings_rounded,
-                        size: isMobile ? 40 : 48,
-                        color: Colors.white,
-                      ),
-                    ),
-                    SizedBox(height: isMobile ? 20 : 28),
-                    // Title
-                    Text(
-                      "Admin Portal",
-                      style: TextStyle(
-                        fontSize: isMobile ? 26 : 32,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1A1A1A),
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    SizedBox(height: isMobile ? 6 : 8),
-                    Text(
-                      "Sign in to access your dashboard",
-                      style: TextStyle(
-                        fontSize: isMobile ? 13 : 15,
-                        color: Colors.grey.shade600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: isMobile ? 28 : 36),
-                    // Username Field
-                    _buildModernInputField(
-                      controller: _emailController,
-                      label: "Username",
-                      hintText: "Enter your username",
-                      icon: Icons.person_rounded,
-                      isPassword: false,
-                      isMobile: isMobile,
-                    ),
-                    SizedBox(height: isMobile ? 16 : 20),
-                    // Password Field
-                    _buildModernInputField(
-                      controller: _passwordController,
-                      label: "Password",
-                      hintText: "Enter your password",
-                      icon: Icons.lock_rounded,
-                      isPassword: true,
-                      isMobile: isMobile,
-                    ),
-                    SizedBox(height: isMobile ? 24 : 32),
-                    // Login Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: isMobile ? 50 : 56,
-                      child: Container(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Logo/Icon
+                      Container(
+                        padding: EdgeInsets.all(isMobile ? 16 : 20),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Colors.green.shade500,
+                              Colors.green.shade400,
                               Colors.green.shade700,
                             ],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(14),
+                          shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.green.withOpacity(0.4),
-                              blurRadius: 12,
-                              offset: const Offset(0, 6),
+                              color: Colors.green.withOpacity(0.3),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                        child: Icon(
+                          Icons.admin_panel_settings_rounded,
+                          size: isMobile ? 40 : 48,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(height: isMobile ? 20 : 28),
+                      // Title
+                      Text(
+                        "Admin Portal",
+                        style: TextStyle(
+                          fontSize: isMobile ? 26 : 32,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF1A1A1A),
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      SizedBox(height: isMobile ? 6 : 8),
+                      Text(
+                        "Sign in to access your dashboard",
+                        style: TextStyle(
+                          fontSize: isMobile ? 13 : 15,
+                          color: Colors.grey.shade600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: isMobile ? 28 : 36),
+                      // Email Field
+                      _buildModernInputField(
+                        controller: _emailController,
+                        label: "Email",
+                        hintText: "Enter your email",
+                        icon: Icons.email_rounded,
+                        isPassword: false,
+                        isMobile: isMobile,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter your email';
+                          }
+                          if (!RegExp(
+                            r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                          ).hasMatch(value.trim())) {
+                            return 'Please enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: isMobile ? 16 : 20),
+                      // Password Field
+                      _buildModernInputField(
+                        controller: _passwordController,
+                        label: "Password",
+                        hintText: "Enter your password",
+                        icon: Icons.lock_rounded,
+                        isPassword: true,
+                        isMobile: isMobile,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your password';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: isMobile ? 24 : 32),
+                      // Login Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: isMobile ? 50 : 56,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.green.shade500,
+                                Colors.green.shade700,
+                              ],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
                             ),
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.green.withOpacity(0.4),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
                           ),
-                          child:
-                              _isLoading
-                                  ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                  : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        "Sign In",
-                                        style: TextStyle(
-                                          fontSize: isMobile ? 16 : 18,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                      SizedBox(width: isMobile ? 6 : 8),
-                                      Icon(
-                                        Icons.arrow_forward_rounded,
-                                        color: Colors.white,
-                                        size: isMobile ? 18 : 20,
-                                      ),
-                                    ],
-                                  ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: isMobile ? 20 : 24),
-                    // Info text
-                    Container(
-                      padding: EdgeInsets.all(isMobile ? 12 : 16),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.blue.shade200,
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline_rounded,
-                            color: Colors.blue.shade700,
-                            size: isMobile ? 18 : 20,
-                          ),
-                          SizedBox(width: isMobile ? 10 : 12),
-                          Expanded(
-                            child: Text(
-                              "Use admin credentials to access",
-                              style: TextStyle(
-                                fontSize: isMobile ? 12 : 13,
-                                color: Colors.blue.shade900,
-                                fontWeight: FontWeight.w500,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _login,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
                             ),
+                            child:
+                                _isLoading
+                                    ? const SizedBox(
+                                      height: 24,
+                                      width: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    )
+                                    : Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          "Sign In",
+                                          style: TextStyle(
+                                            fontSize: isMobile ? 16 : 18,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        SizedBox(width: isMobile ? 6 : 8),
+                                        Icon(
+                                          Icons.arrow_forward_rounded,
+                                          color: Colors.white,
+                                          size: isMobile ? 18 : 20,
+                                        ),
+                                      ],
+                                    ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -393,7 +439,9 @@ class _AdminLoginState extends State<AdminLogin> {
     required String hintText,
     required IconData icon,
     required bool isPassword,
-    bool isMobile = false,
+    required bool isMobile,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,9 +462,11 @@ class _AdminLoginState extends State<AdminLogin> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey.shade300, width: 1.5),
           ),
-          child: TextField(
+          child: TextFormField(
             controller: controller,
             obscureText: isPassword && !_isPasswordVisible,
+            keyboardType: keyboardType,
+            validator: validator,
             style: TextStyle(
               fontSize: isMobile ? 15 : 16,
               color: const Color(0xFF1A1A1A),
