@@ -13,7 +13,6 @@ class BottomNavigation extends StatefulWidget {
 
 class _BottomNavigationState extends State<BottomNavigation>
     with SingleTickerProviderStateMixin {
-  final plantName = TextEditingController();
   int _currentIndex = 0;
   late AnimationController _animationController;
 
@@ -32,51 +31,30 @@ class _BottomNavigationState extends State<BottomNavigation>
       case 0:
         return const HomePage();
       case 1:
+        return _buildAnalyticsPage();
+      case 2:
+        return _buildChatbotPage();
+      case 3:
         return const ProfilePage();
       default:
         return const HomePage();
     }
   }
 
+  // Analytics Page
+  Widget _buildAnalyticsPage() {
+    return const HomePage(initialTab: 0);
+  }
+
+  // Chatbot Page
+  Widget _buildChatbotPage() {
+    return const HomePage(initialTab: 1);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _getCurrentPage(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: Container(
-        height: 70,
-        width: 70,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF0F8113), Color(0xFF1A9D1F)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0F8113).withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: FloatingActionButton(
-          onPressed: () {
-            Get.to(() => PlantCameraScreen());
-          },
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25),
-          ),
-          child: const Icon(
-            Icons.camera_alt_rounded,
-            size: 32,
-            color: Colors.white,
-          ),
-        ),
-      ),
       bottomNavigationBar: Container(
         height: 70,
         decoration: BoxDecoration(
@@ -93,9 +71,43 @@ class _BottomNavigationState extends State<BottomNavigation>
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildNavItem(0, Icons.home_rounded, 'Home'),
-            const SizedBox(width: 50), // Space for FAB
-            _buildNavItem(1, Icons.person_rounded, 'Profile'),
+            _buildNavItem(1, Icons.analytics_rounded, 'Analytics'),
+            _buildCameraButton(),
+            _buildNavItem(2, Icons.smart_toy_rounded, 'AI Chatbot'),
+            _buildNavItem(3, Icons.person_rounded, 'Profile'),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCameraButton() {
+    return GestureDetector(
+      onTap: () {
+        Get.to(() => PlantCameraScreen());
+      },
+      child: Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF0F8113), Color(0xFF1A9D1F)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F8113).withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.camera_alt_rounded,
+          size: 32,
+          color: Colors.white,
         ),
       ),
     );
@@ -147,6 +159,5 @@ class _BottomNavigationState extends State<BottomNavigation>
   void dispose() {
     _animationController.dispose();
     super.dispose();
-    plantName.clear();
   }
 }

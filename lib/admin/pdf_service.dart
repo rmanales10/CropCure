@@ -75,6 +75,7 @@ class PdfService {
     }
 
     final pdf = pw.Document();
+    // Get current date and time (local timezone)
     final now = DateTime.now();
     final dateFormat = DateFormat('MMMM dd, yyyy');
     final timeFormat = DateFormat('hh:mm a');
@@ -87,6 +88,7 @@ class PdfService {
     // Generate report based on type
     switch (reportType) {
       case ReportType.summary:
+        // First page: Overview with statistics and disease distribution
         pdf.addPage(
           pw.MultiPage(
             pageFormat: PdfPageFormat.a4,
@@ -118,6 +120,17 @@ class PdfService {
             },
           ),
         );
+
+        // Additional pages: Scan history table
+        if (historyData.isNotEmpty) {
+          _addHistoryTablePages(
+            pdf,
+            historyData,
+            adminInfo,
+            reportTitle,
+            showUserColumn: false,
+          );
+        }
         break;
 
       case ReportType.detailed:
@@ -648,7 +661,7 @@ class PdfService {
     );
   }
 
-  // Disease distribution section
+  // Disease distribution section with table format
   static pw.Widget _buildDiseaseDistributionSection(
     Map<String, int> diseaseDistribution,
   ) {
@@ -656,46 +669,105 @@ class PdfService {
         diseaseDistribution.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
 
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          'Disease Distribution',
-          style: pw.TextStyle(
-            fontSize: 20,
-            fontWeight: pw.FontWeight.bold,
-            color: PdfColor.fromHex('#1A1A1A'),
-          ),
+    final topDiseases = sortedDiseases.take(10).toList();
+    final total = diseaseDistribution.values.reduce((a, b) => a + b);
+
+    if (topDiseases.isEmpty) {
+      return pw.Container(
+        padding: const pw.EdgeInsets.all(16),
+        decoration: pw.BoxDecoration(
+          color: PdfColor.fromHex('#F9FAFB'),
+          borderRadius: pw.BorderRadius.circular(12),
+          border: pw.Border.all(color: PdfColor.fromHex('#E5E7EB'), width: 1),
         ),
-        pw.SizedBox(height: 16),
-        pw.Table(
-          border: pw.TableBorder.all(
-            color: PdfColor.fromHex('#E5E7EB'),
-            width: 1,
-          ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.TableRow(
-              decoration: pw.BoxDecoration(color: PdfColor.fromHex('#F9FAFB')),
-              children: [
-                _buildTableHeader('Disease Name'),
-                _buildTableHeader('Count'),
-                _buildTableHeader('Percentage'),
-              ],
+            pw.Text(
+              'Disease Distribution',
+              style: pw.TextStyle(
+                fontSize: 20,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColor.fromHex('#1A1A1A'),
+              ),
             ),
-            ...sortedDiseases.take(10).map((entry) {
-              final total = diseaseDistribution.values.reduce((a, b) => a + b);
-              final percentage = (entry.value / total * 100).toStringAsFixed(1);
-              return pw.TableRow(
-                children: [
-                  _buildTableCell(entry.key),
-                  _buildTableCell(entry.value.toString()),
-                  _buildTableCell('$percentage%'),
-                ],
-              );
-            }),
+            pw.SizedBox(height: 16),
+            pw.Center(
+              child: pw.Text(
+                'No disease data available for distribution.',
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  color: PdfColor.fromHex('#6B7280'),
+                ),
+              ),
+            ),
           ],
         ),
-      ],
+      );
+    }
+
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(16),
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromHex('#F9FAFB'),
+        borderRadius: pw.BorderRadius.circular(12),
+        border: pw.Border.all(color: PdfColor.fromHex('#E5E7EB'), width: 1),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'Disease Distribution',
+            style: pw.TextStyle(
+              fontSize: 20,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColor.fromHex('#1A1A1A'),
+            ),
+          ),
+          pw.SizedBox(height: 16),
+          pw.Table(
+            border: pw.TableBorder.all(
+              color: PdfColor.fromHex('#E5E7EB'),
+              width: 1,
+            ),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(3),
+              1: const pw.FlexColumnWidth(1),
+              2: const pw.FlexColumnWidth(1),
+            },
+            children: [
+              pw.TableRow(
+                decoration: pw.BoxDecoration(
+                  color: PdfColor.fromHex('#F9FAFB'),
+                ),
+                children: [
+                  _buildTableHeader('Disease Name'),
+                  _buildTableHeader('Count'),
+                  _buildTableHeader('Percentage'),
+                ],
+              ),
+              ...topDiseases.map((entry) {
+                final percentage = (entry.value / total * 100).toStringAsFixed(
+                  1,
+                );
+                return pw.TableRow(
+                  children: [
+                    _buildTableCell(entry.key),
+                    _buildTableCell(
+                      entry.value.toString(),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                    _buildTableCell(
+                      '$percentage%',
+                      textAlign: pw.TextAlign.center,
+                    ),
+                  ],
+                );
+              }),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -785,59 +857,76 @@ class PdfService {
     int diseaseDetected,
     int healthyScans,
   ) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          'Summary Statistics',
-          style: pw.TextStyle(
-            fontSize: 20,
-            fontWeight: pw.FontWeight.bold,
-            color: PdfColor.fromHex('#1A1A1A'),
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(16),
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromHex('#F9FAFB'),
+        borderRadius: pw.BorderRadius.circular(12),
+        border: pw.Border.all(color: PdfColor.fromHex('#E5E7EB'), width: 1),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'Summary Statistics',
+            style: pw.TextStyle(
+              fontSize: 20,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColor.fromHex('#1A1A1A'),
+            ),
           ),
-        ),
-        pw.SizedBox(height: 16),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            _buildStatCard(
-              'Total Scans',
-              totalScans.toString(),
-              PdfColor.fromHex('#3B82F6'),
-            ),
-            _buildStatCard(
-              'Diseases Detected',
-              diseaseDetected.toString(),
-              PdfColor.fromHex('#F97316'),
-            ),
-            _buildStatCard(
-              'Healthy Plants',
-              healthyScans.toString(),
-              PdfColor.fromHex('#10B981'),
-            ),
-          ],
-        ),
-      ],
+          pw.SizedBox(height: 16),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              _buildStatCard(
+                'Total Scans',
+                totalScans.toString(),
+                PdfColor.fromHex('#3B82F6'),
+              ),
+              _buildStatCard(
+                'Diseases Detected',
+                diseaseDetected.toString(),
+                PdfColor.fromHex('#F97316'),
+              ),
+              _buildStatCard(
+                'Healthy Plants',
+                healthyScans.toString(),
+                PdfColor.fromHex('#10B981'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  static pw.Widget _buildStatCard(String title, String value, PdfColor color) {
+  static pw.Widget _buildStatCard(
+    String title,
+    String value,
+    PdfColor color, {
+    String? subtitle,
+  }) {
     return pw.Flexible(
       child: pw.Container(
         padding: const pw.EdgeInsets.all(16),
         margin: const pw.EdgeInsets.symmetric(horizontal: 4),
         decoration: pw.BoxDecoration(
+          color: PdfColor.fromHex('#F3F4F6'),
           border: pw.Border.all(color: color, width: 2),
           borderRadius: pw.BorderRadius.circular(12),
         ),
         child: pw.Column(
+          mainAxisSize: pw.MainAxisSize.min,
           children: [
             pw.Text(
               title,
               style: pw.TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 color: PdfColor.fromHex('#6B7280'),
+                fontWeight: pw.FontWeight.bold,
               ),
+              textAlign: pw.TextAlign.center,
             ),
             pw.SizedBox(height: 8),
             pw.Text(
@@ -847,7 +936,19 @@ class PdfService {
                 fontWeight: pw.FontWeight.bold,
                 color: color,
               ),
+              textAlign: pw.TextAlign.center,
             ),
+            if (subtitle != null) ...[
+              pw.SizedBox(height: 4),
+              pw.Text(
+                subtitle,
+                style: pw.TextStyle(
+                  fontSize: 10,
+                  color: PdfColor.fromHex('#6B7280'),
+                ),
+                textAlign: pw.TextAlign.center,
+              ),
+            ],
           ],
         ),
       ),
@@ -1147,11 +1248,16 @@ class PdfService {
     );
   }
 
-  static pw.Widget _buildTableCell(String text, {PdfColor? color}) {
+  static pw.Widget _buildTableCell(
+    String text, {
+    PdfColor? color,
+    pw.TextAlign? textAlign,
+  }) {
     return pw.Padding(
       padding: const pw.EdgeInsets.all(8),
       child: pw.Text(
         text,
+        textAlign: textAlign ?? pw.TextAlign.left,
         style: pw.TextStyle(
           fontSize: 10,
           color: color ?? PdfColor.fromHex('#1F2937'),

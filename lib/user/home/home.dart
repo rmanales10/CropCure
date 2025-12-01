@@ -3,15 +3,18 @@ import 'dart:typed_data';
 import 'package:cropcure/user/home/home_controller.dart';
 import 'package:cropcure/user/home/daily_reminder_controller.dart';
 import 'package:cropcure/user/profile/profile_controller.dart';
-import 'package:cropcure/user/chatbot/chatbot_screen.dart';
+import 'package:cropcure/user/chatbot/chatbot_controller.dart';
+import 'package:cropcure/admin/pdf_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final int? initialTab;
+  const HomePage({super.key, this.initialTab});
 
   @override
   // ignore: library_private_types_in_public_api
@@ -27,6 +30,24 @@ class _HomePageState extends State<HomePage> {
   static const int _itemsPerPage = 5;
   DateTime? _startDate;
   DateTime? _endDate;
+  int _selectedBottomNavIndex = 0; // 0 = Analytics, 1 = AI Chatbot
+  final ScrollController _chatScrollController = ScrollController();
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Set initial tab if provided
+    if (widget.initialTab != null &&
+        _selectedBottomNavIndex != widget.initialTab) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _selectedBottomNavIndex = widget.initialTab!;
+          });
+        }
+      });
+    }
+  }
 
   // Helper function to check if a plant is healthy
   bool _isPlantHealthy(String? disease) {
@@ -43,6 +64,30 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     fetchData();
+
+    // Auto-scroll chat when messages change
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (Get.isRegistered<ChatbotController>()) {
+        final chatbotController = Get.find<ChatbotController>();
+        ever(chatbotController.messages, (_) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_chatScrollController.hasClients) {
+              _chatScrollController.animateTo(
+                _chatScrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            }
+          });
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _chatScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> fetchData() async {
@@ -53,6 +98,28 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // If accessed from main bottom nav with specific tab, show that tab without internal nav
+    if (widget.initialTab != null) {
+      return Scaffold(
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.white, Colors.green.shade50],
+            ),
+          ),
+          child: SafeArea(
+            child:
+                widget.initialTab == 0
+                    ? _buildAnalyticsView()
+                    : _buildChatbotView(),
+          ),
+        ),
+      );
+    }
+
+    // Default Home page: show main content without Analytics/Chatbot tabs
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -62,26 +129,325 @@ class _HomePageState extends State<HomePage> {
             colors: [Colors.white, Colors.green.shade50],
           ),
         ),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: SafeArea(child: _buildHomeView()),
+      ),
+    );
+  }
 
-                  children: [
-                    _buildGreetingSection(),
-                    _buildDailyReminderCard(),
-                    _buildScanHistoryCard(),
-                    _buildAIChatbotCard(),
-                    _buildFAQsCard(),
-                    const SizedBox(height: 40),
-                  ],
-                ),
-              ),
-            ],
-          ),
+  Widget _buildHomeView() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildGreetingSection(),
+          _buildDailyReminderCard(),
+          _buildScanHistoryCard(),
+          _buildFAQsCard(),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsView() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [_buildAnalyticsCard(), const SizedBox(height: 40)],
+      ),
+    );
+  }
+
+  Widget _buildChatbotView() {
+    final chatbotController =
+        Get.isRegistered<ChatbotController>()
+            ? Get.find<ChatbotController>()
+            : Get.put(ChatbotController());
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.green.shade50, Colors.white],
         ),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.shade700,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.smart_toy_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'AI Chatbot',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'CropCure Assistant',
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      color: Colors.white,
+                    ),
+                    onPressed: () {
+                      Get.dialog(
+                        AlertDialog(
+                          title: const Text('Clear Chat'),
+                          content: const Text(
+                            'Are you sure you want to clear the conversation?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Get.back(),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                chatbotController.clearChat();
+                                Get.back();
+                              },
+                              child: const Text(
+                                'Clear',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    tooltip: 'Clear chat',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Messages List
+          Expanded(
+            child: Obx(() {
+              if (chatbotController.isLoadingHistory.value) {
+                return const Center(
+                  child: CircularProgressIndicator(color: Colors.green),
+                );
+              }
+
+              if (chatbotController.messages.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.smart_toy_rounded,
+                        size: 64,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Start a conversation',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Ask me anything about plant care!',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                controller: _chatScrollController,
+                padding: const EdgeInsets.all(16),
+                itemCount: chatbotController.messages.length,
+                itemBuilder: (context, index) {
+                  final message = chatbotController.messages[index];
+                  final isUser = message.isUser;
+
+                  return Align(
+                    alignment:
+                        isUser ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.75,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isUser ? Colors.green.shade700 : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            message.text,
+                            style: TextStyle(
+                              color:
+                                  isUser ? Colors.white : Colors.grey.shade800,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            DateFormat('hh:mm a').format(message.timestamp),
+                            style: TextStyle(
+                              color:
+                                  isUser
+                                      ? Colors.white70
+                                      : Colors.grey.shade500,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            }),
+          ),
+          // Input Section
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: chatbotController.textController,
+                      decoration: InputDecoration(
+                        hintText: 'Type your message...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide(color: Colors.green.shade700),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                      onSubmitted: (value) {
+                        if (value.trim().isNotEmpty) {
+                          chatbotController.sendMessage(value);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Obx(() {
+                    return IconButton(
+                      onPressed:
+                          chatbotController.isLoading.value
+                              ? null
+                              : () {
+                                final text =
+                                    chatbotController.textController.text
+                                        .trim();
+                                if (text.isNotEmpty) {
+                                  chatbotController.sendMessage(text);
+                                }
+                              },
+                      icon:
+                          chatbotController.isLoading.value
+                              ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.green,
+                                ),
+                              )
+                              : Icon(
+                                Icons.send_rounded,
+                                color: Colors.green.shade700,
+                                size: 28,
+                              ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.green.shade50,
+                        padding: const EdgeInsets.all(12),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -290,79 +656,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildAIChatbotCard() {
-    return Padding(
-      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0),
-      child: Card(
-        elevation: 5,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: InkWell(
-          onTap: () {
-            Get.to(() => const ChatbotScreen());
-          },
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue.shade400, Colors.blue.shade600],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blue.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.smart_toy_rounded,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'AI Chatbot',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey.shade800,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Ask about treatments and tutorials',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: Colors.grey.shade400,
-                  size: 20,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildFAQsCard() {
     return Padding(
       padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0),
@@ -434,6 +727,507 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  Widget _buildAnalyticsCard() {
+    return Obx(() {
+      final history = _homeController.history;
+      final totalScans = history.length;
+      final diseaseDetected =
+          history
+              .where((plant) => !_isPlantHealthy(plant['disease']?.toString()))
+              .length;
+      final healthyScans = totalScans - diseaseDetected;
+
+      return Padding(
+        padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0),
+        child: Card(
+          elevation: 5,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF0F8113), Color(0xFF1A9D1F)],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.purple.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.analytics_rounded,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Text(
+                          'Analytics',
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: Color(0xFF1A1A1A),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Generate Reports Icon Button
+                    IconButton(
+                      onPressed: () {
+                        _generateUserReport();
+                      },
+                      icon: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.picture_as_pdf_rounded,
+                          color: Colors.green.shade700,
+                          size: 24,
+                        ),
+                      ),
+                      tooltip: 'Generate Reports',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // Statistics Row
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildAnalyticsStatCard(
+                        title: 'Total Scans',
+                        value: totalScans.toString(),
+                        icon: Icons.camera_alt_rounded,
+                        color: Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildAnalyticsStatCard(
+                        title: 'Diseases',
+                        value: diseaseDetected.toString(),
+                        icon: Icons.warning_rounded,
+                        color: Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildAnalyticsStatCard(
+                        title: 'Healthy',
+                        value: healthyScans.toString(),
+                        icon: Icons.check_circle_rounded,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // Top Diseases Bar Chart
+                _buildTopDiseasesBarChart(),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildTopDiseasesBarChart() {
+    final now = DateTime.now();
+    final topDiseases = _homeController.getTopDiseasesForMonth(
+      month: now.month,
+      year: now.year,
+    );
+
+    // Filter out healthy plants and get top 10 diseases
+    final diseaseEntries =
+        topDiseases.entries
+            .where((entry) => !_isPlantHealthy(entry.key))
+            .take(10)
+            .toList();
+
+    if (diseaseEntries.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Top Diseases',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: Column(
+                children: [
+                  Text(
+                    'No disease data available',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Total number of each disease detected',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final maxCount =
+        diseaseEntries
+            .map((e) => e.value)
+            .reduce((a, b) => a > b ? a : b)
+            .toDouble();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Disease Distribution',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Total number of each disease detected',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 300,
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxCount > 0 ? maxCount + 1 : 5,
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (group) => Colors.grey.shade800,
+                    tooltipPadding: const EdgeInsets.all(8),
+                    tooltipMargin: 8,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final diseaseName = diseaseEntries[groupIndex].key;
+                      final count = diseaseEntries[groupIndex].value;
+                      return BarTooltipItem(
+                        '$diseaseName\n$count',
+                        TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        if (value.toInt() >= diseaseEntries.length) {
+                          return const Text('');
+                        }
+                        if (value.toInt() >= diseaseEntries.length) {
+                          return const Text('');
+                        }
+                        final diseaseName = diseaseEntries[value.toInt()].key;
+                        // Truncate long disease names to fit better (matching image style)
+                        final displayName =
+                            diseaseName.length > 20
+                                ? '${diseaseName.substring(0, 20)}...'
+                                : diseaseName;
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            displayName,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      },
+                      reservedSize: 70,
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 45,
+                      interval: 1,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          value.toInt().toString(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 1,
+                  getDrawingHorizontalLine:
+                      (value) => FlLine(
+                        color: Colors.grey.shade300,
+                        strokeWidth: 1,
+                        dashArray: [5, 5],
+                      ),
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey.shade300, width: 1),
+                    left: BorderSide(color: Colors.grey.shade300, width: 1),
+                  ),
+                ),
+                barGroups: List.generate(
+                  diseaseEntries.length,
+                  (index) => BarChartGroupData(
+                    x: index,
+                    barRods: [
+                      BarChartRodData(
+                        toY: diseaseEntries[index].value.toDouble(),
+                        color: Colors.red.shade600,
+                        width: 35,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(4),
+                          topRight: Radius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsStatCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _generateUserReport() async {
+    try {
+      // Show loading indicator
+      Get.dialog(
+        const Center(child: CircularProgressIndicator()),
+        barrierDismissible: false,
+      );
+
+      // Ensure we have the latest data
+      await _homeController.fetchPlants();
+
+      final historyData = _homeController.history.toList();
+
+      if (historyData.isEmpty) {
+        Get.back(); // Close loading dialog
+        Get.snackbar(
+          'No Data',
+          'You have no scan history to generate a report.',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.orange.shade600,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      // Calculate statistics
+      final totalScans = historyData.length;
+      final diseaseDetected =
+          historyData
+              .where((plant) => !_isPlantHealthy(plant['disease']?.toString()))
+              .length;
+      final healthyScans = totalScans - diseaseDetected;
+
+      // Calculate disease distribution
+      Map<String, int> diseaseDistribution = {};
+      for (var plant in historyData) {
+        final disease = plant['disease']?.toString() ?? 'Unknown';
+        if (!_isPlantHealthy(disease)) {
+          diseaseDistribution[disease] =
+              (diseaseDistribution[disease] ?? 0) + 1;
+        }
+      }
+
+      // Calculate disease scans per day (current month)
+      final now = DateTime.now();
+      final diseaseScansPerDay = _homeController.getDiseaseScansPerDay(
+        month: now.month,
+        year: now.year,
+      );
+
+      // Get user information
+      final user = FirebaseAuth.instance.currentUser;
+      Map<String, dynamic>? userInfo;
+      if (user != null) {
+        try {
+          final userDoc =
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .get();
+          if (userDoc.exists) {
+            final data = userDoc.data();
+            userInfo = {
+              'name': data?['fullname'] ?? 'User',
+              'email': data?['email'] ?? user.email ?? 'N/A',
+              'role': 'User',
+              'uid': user.uid,
+            };
+          }
+        } catch (e) {
+          print('Error fetching user info: $e');
+        }
+      }
+
+      // Fallback user info
+      if (userInfo == null) {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        userInfo = {
+          'name': _profileController.userInfo['fullname']?.toString() ?? 'User',
+          'email': currentUser?.email ?? 'N/A',
+          'role': 'User',
+          'uid': currentUser?.uid ?? 'N/A',
+        };
+      }
+
+      // Generate the PDF report
+      await PdfService.generateAnalyticsReport(
+        historyData: historyData,
+        totalScans: totalScans,
+        diseaseDetected: diseaseDetected,
+        healthyScans: healthyScans,
+        diseaseScansPerDay: diseaseScansPerDay,
+        adminInfo: userInfo, // Using userInfo as adminInfo for user reports
+        reportType: ReportType.summary,
+        userId: user?.uid,
+        diseaseDistribution: diseaseDistribution,
+      );
+
+      Get.back(); // Close loading dialog
+
+      Get.snackbar(
+        'Success',
+        'PDF Report Generated Successfully!',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green.shade600,
+        colorText: Colors.white,
+        icon: const Icon(Icons.check_circle, color: Colors.white),
+        duration: const Duration(seconds: 2),
+      );
+    } catch (e) {
+      Get.back(); // Close loading dialog if still open
+      Get.snackbar(
+        'Error',
+        'Failed to generate PDF: $e',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red.shade600,
+        colorText: Colors.white,
+        icon: const Icon(Icons.error, color: Colors.white),
+        duration: const Duration(seconds: 3),
+      );
+    }
   }
 
   Widget _buildScanHistoryCard() {
