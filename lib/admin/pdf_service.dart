@@ -112,7 +112,10 @@ class PdfService {
                 pw.SizedBox(height: 30),
                 if (diseaseDistribution != null &&
                     diseaseDistribution.isNotEmpty)
-                  _buildDiseaseDistributionSection(diseaseDistribution),
+                  _buildDiseaseDistributionSection(
+                    diseaseDistribution,
+                    diseaseDetected,
+                  ),
               ];
             },
             footer: (pw.Context context) {
@@ -163,7 +166,10 @@ class PdfService {
                 pw.SizedBox(height: 20),
                 if (diseaseDistribution != null &&
                     diseaseDistribution.isNotEmpty)
-                  _buildDiseaseDistributionSection(diseaseDistribution),
+                  _buildDiseaseDistributionSection(
+                    diseaseDistribution,
+                    diseaseDetected,
+                  ),
               ];
             },
             footer: (pw.Context context) {
@@ -239,7 +245,10 @@ class PdfService {
                 pw.SizedBox(height: 25),
                 if (diseaseDistribution != null &&
                     diseaseDistribution.isNotEmpty)
-                  _buildDiseaseDistributionSection(diseaseDistribution),
+                  _buildDiseaseDistributionSection(
+                    diseaseDistribution,
+                    diseaseDetected,
+                  ),
               ];
             },
             footer: (pw.Context context) {
@@ -284,7 +293,10 @@ class PdfService {
                 ),
                 pw.SizedBox(height: 30),
                 if (diseaseDistribution != null)
-                  _buildDiseaseDistributionSection(diseaseDistribution),
+                  _buildDiseaseDistributionSection(
+                    diseaseDistribution,
+                    diseaseDetected,
+                  ),
                 pw.SizedBox(height: 30),
                 if (weeklyComparison != null)
                   _buildWeeklyComparisonSection(weeklyComparison),
@@ -664,15 +676,22 @@ class PdfService {
   // Disease distribution section with table format
   static pw.Widget _buildDiseaseDistributionSection(
     Map<String, int> diseaseDistribution,
+    int diseaseDetected,
   ) {
     final sortedDiseases =
         diseaseDistribution.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
 
-    final topDiseases = sortedDiseases.take(10).toList();
-    final total = diseaseDistribution.values.reduce((a, b) => a + b);
+    // Show all diseases, not just top 10
+    final allDiseases = sortedDiseases;
 
-    if (topDiseases.isEmpty) {
+    // Use diseaseDetected as the total for accurate percentage calculation
+    final total =
+        diseaseDetected > 0
+            ? diseaseDetected
+            : diseaseDistribution.values.fold(0, (a, b) => a + b);
+
+    if (allDiseases.isEmpty) {
       return pw.Container(
         padding: const pw.EdgeInsets.all(16),
         decoration: pw.BoxDecoration(
@@ -746,10 +765,15 @@ class PdfService {
                   _buildTableHeader('Percentage'),
                 ],
               ),
-              ...topDiseases.map((entry) {
-                final percentage = (entry.value / total * 100).toStringAsFixed(
-                  1,
-                );
+              ...allDiseases.map((entry) {
+                // Safe percentage calculation with NaN protection
+                String percentage = '0.0';
+                if (total > 0 && entry.value >= 0) {
+                  final calc = (entry.value / total * 100);
+                  if (calc.isFinite && !calc.isNaN) {
+                    percentage = calc.toStringAsFixed(1);
+                  }
+                }
                 return pw.TableRow(
                   children: [
                     _buildTableCell(entry.key),
@@ -777,7 +801,12 @@ class PdfService {
   ) {
     final current = weeklyComparison['current'] ?? 0;
     final previous = weeklyComparison['previous'] ?? 0;
-    final change = weeklyComparison['change'] ?? 0.0;
+    final changeValue = weeklyComparison['change'] ?? 0.0;
+    // Ensure change is a valid number, not NaN
+    final change =
+        (changeValue is num && changeValue.isFinite && !changeValue.isNaN)
+            ? changeValue.toDouble()
+            : 0.0;
     final isIncrease = change >= 0;
 
     return pw.Container(
@@ -814,7 +843,7 @@ class PdfService {
               pw.Flexible(
                 child: _buildComparisonCard(
                   'Change',
-                  '${isIncrease ? '+' : ''}${change.toStringAsFixed(1)}%',
+                  '${isIncrease ? '+' : ''}${change.isFinite && !change.isNaN ? change.toStringAsFixed(1) : '0.0'}%',
                   color:
                       isIncrease
                           ? PdfColor.fromHex('#EF4444')
@@ -956,14 +985,189 @@ class PdfService {
   }
 
   static pw.Widget _buildChartSection(Map<String, int> diseaseScansPerDay) {
-    final days = diseaseScansPerDay.keys.toList()..sort();
-    final scans = days.map((d) => diseaseScansPerDay[d]!).toList();
+    // Handle null or empty map
+    if (diseaseScansPerDay.isEmpty) {
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'Disease Scans Per Day',
+            style: pw.TextStyle(
+              fontSize: 20,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColor.fromHex('#1A1A1A'),
+            ),
+          ),
+          pw.SizedBox(height: 16),
+          pw.Container(
+            height: 200,
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColor.fromHex('#E5E7EB')),
+              borderRadius: pw.BorderRadius.circular(12),
+            ),
+            child: pw.Center(
+              child: pw.Text(
+                'No disease scan data available',
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  color: PdfColor.fromHex('#6B7280'),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
-    final maxScan = scans.isEmpty ? 10 : scans.reduce((a, b) => a > b ? a : b);
+    // Sort days numerically (as integers) instead of alphabetically
+    final days =
+        diseaseScansPerDay.keys.toList()..sort((a, b) {
+          final aInt = int.tryParse(a) ?? 0;
+          final bInt = int.tryParse(b) ?? 0;
+          return aInt.compareTo(bInt);
+        });
+
+    // Validate all values before mapping - ensure they're valid integers
+    final validDays = <String>[];
+    final validScans = <int>[];
+
+    for (final day in days) {
+      final value = diseaseScansPerDay[day];
+      if (value != null && value >= 0 && day.isNotEmpty) {
+        validDays.add(day);
+        validScans.add(value);
+      }
+    }
+
+    if (validDays.isEmpty ||
+        validScans.isEmpty ||
+        validDays.length != validScans.length) {
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'Disease Scans Per Day',
+            style: pw.TextStyle(
+              fontSize: 20,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColor.fromHex('#1A1A1A'),
+            ),
+          ),
+          pw.SizedBox(height: 16),
+          pw.Container(
+            height: 200,
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColor.fromHex('#E5E7EB')),
+              borderRadius: pw.BorderRadius.circular(12),
+            ),
+            child: pw.Center(
+              child: pw.Text(
+                'No disease scan data available',
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  color: PdfColor.fromHex('#6B7280'),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Limit to reasonable number of data points to avoid rendering issues
+    final maxDataPoints = 31; // Max days in a month
+    final displayDays =
+        validDays.length > maxDataPoints
+            ? validDays.take(maxDataPoints).toList()
+            : validDays;
+    final displayScans = validScans.take(displayDays.length).toList();
+
+    // Ensure we have matching lengths
+    if (displayDays.length != displayScans.length || displayDays.isEmpty) {
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'Disease Scans Per Day',
+            style: pw.TextStyle(
+              fontSize: 20,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColor.fromHex('#1A1A1A'),
+            ),
+          ),
+          pw.SizedBox(height: 16),
+          pw.Container(
+            height: 200,
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColor.fromHex('#E5E7EB')),
+              borderRadius: pw.BorderRadius.circular(12),
+            ),
+            child: pw.Center(
+              child: pw.Text(
+                'No disease scan data available',
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  color: PdfColor.fromHex('#6B7280'),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Calculate max scan (int values are always valid)
+    int maxScan = 0;
+    if (displayScans.isNotEmpty) {
+      maxScan = displayScans.reduce((a, b) => a > b ? a : b);
+    }
+
     final yAxisValues = <double>[];
-    final step = (maxScan / 5).ceilToDouble();
+
+    // Calculate step for y-axis with NaN protection
+    double step = 1.0;
+    if (maxScan > 0) {
+      final calculatedStep = (maxScan / 5).ceilToDouble();
+      if (calculatedStep.isFinite &&
+          !calculatedStep.isNaN &&
+          calculatedStep > 0) {
+        step = calculatedStep;
+      }
+    }
+
+    // Generate y-axis values with validation
     for (int i = 0; i <= 5; i++) {
-      yAxisValues.add(i * step);
+      final value = i * step;
+      if (value.isFinite && !value.isNaN && value >= 0) {
+        yAxisValues.add(value);
+      } else {
+        yAxisValues.add(i.toDouble());
+      }
+    }
+
+    // Remove duplicates and ensure at least 2 values
+    final uniqueYValues =
+        yAxisValues
+            .where((v) => v.isFinite && !v.isNaN && v >= 0)
+            .toSet()
+            .toList()
+          ..sort();
+    if (uniqueYValues.length < 2) {
+      uniqueYValues.clear();
+      for (int i = 0; i <= 5; i++) {
+        uniqueYValues.add(i.toDouble());
+      }
+    }
+
+    // Create chart data points with NaN protection
+    final chartData = <pw.LineChartValue>[];
+    for (int i = 0; i < displayScans.length; i++) {
+      final x = i.toDouble();
+      final y = displayScans[i].toDouble();
+      // Validate both x and y are finite and not NaN
+      final safeX = x.isFinite && !x.isNaN && x >= 0 ? x : 0.0;
+      final safeY = y.isFinite && !y.isNaN && y >= 0 ? y : 0.0;
+      chartData.add(pw.LineChartValue(safeX, safeY));
     }
 
     return pw.Column(
@@ -986,56 +1190,50 @@ class PdfService {
           ),
           child: pw.Padding(
             padding: const pw.EdgeInsets.all(16),
-            child:
-                scans.isEmpty
-                    ? pw.Center(
-                      child: pw.Text(
-                        'No disease scan data available',
-                        style: pw.TextStyle(
-                          fontSize: 14,
-                          color: PdfColor.fromHex('#6B7280'),
-                        ),
-                      ),
-                    )
-                    : pw.Chart(
-                      grid: pw.CartesianGrid(
-                        xAxis: pw.FixedAxis.fromStrings(
-                          List<String>.from(days),
-                          marginStart: 30,
-                          marginEnd: 10,
-                          ticks: true,
-                          textStyle: pw.TextStyle(
-                            fontSize: 10,
-                            color: PdfColor.fromHex('#6B7280'),
-                          ),
-                        ),
-                        yAxis: pw.FixedAxis(
-                          yAxisValues,
-                          format: (v) => v.toInt().toString(),
-                          divisions: true,
-                          ticks: true,
-                          textStyle: pw.TextStyle(
-                            fontSize: 10,
-                            color: PdfColor.fromHex('#6B7280'),
-                          ),
-                        ),
-                      ),
-                      datasets: [
-                        pw.LineDataSet(
-                          legend: 'Disease Scans',
-                          drawPoints: true,
-                          isCurved: true,
-                          color: PdfColor.fromHex('#10B981'),
-                          data: List.generate(
-                            scans.length,
-                            (i) => pw.LineChartValue(
-                              i.toDouble(),
-                              scans[i].toDouble(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+            child: pw.Chart(
+              grid: pw.CartesianGrid(
+                xAxis: pw.FixedAxis.fromStrings(
+                  displayDays,
+                  marginStart: 30,
+                  marginEnd: 10,
+                  ticks: true,
+                  textStyle: pw.TextStyle(
+                    fontSize: 10,
+                    color: PdfColor.fromHex('#6B7280'),
+                  ),
+                ),
+                yAxis: pw.FixedAxis(
+                  uniqueYValues,
+                  format: (v) {
+                    // Strict validation to prevent NaN
+                    if (!v.isFinite || v.isNaN || v < 0) {
+                      return '0';
+                    }
+                    try {
+                      final intValue = v.toInt();
+                      return intValue.toString();
+                    } catch (e) {
+                      return '0';
+                    }
+                  },
+                  divisions: true,
+                  ticks: true,
+                  textStyle: pw.TextStyle(
+                    fontSize: 10,
+                    color: PdfColor.fromHex('#6B7280'),
+                  ),
+                ),
+              ),
+              datasets: [
+                pw.LineDataSet(
+                  legend: 'Disease Scans',
+                  drawPoints: true,
+                  isCurved: true,
+                  color: PdfColor.fromHex('#10B981'),
+                  data: chartData,
+                ),
+              ],
+            ),
           ),
         ),
       ],

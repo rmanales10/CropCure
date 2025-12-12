@@ -1926,7 +1926,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       final sorted =
                           diseaseDistribution.entries.toList()
                             ..sort((a, b) => b.value.compareTo(a.value));
-                      return sorted.take(10).map((entry) {
+                      return sorted.map((entry) {
                         final percentage =
                             (userInfo['diseaseDetected'] as int) > 0
                                 ? (entry.value /
@@ -2729,15 +2729,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     }
                   }
 
-                  // Sort diseases by count (descending) and take top ones
+                  // Sort diseases by count (descending) - show all diseases
                   final sortedDiseases =
                       diseaseDistribution.entries.toList()
                         ..sort((a, b) => b.value.compareTo(a.value));
 
-                  // Take top 10 diseases for better visualization
-                  final topDiseases = sortedDiseases.take(10).toList();
+                  // Show all diseases, not just top 10
+                  final allDiseases = sortedDiseases;
 
-                  if (topDiseases.isEmpty) {
+                  if (allDiseases.isEmpty) {
                     return Center(
                       child: Padding(
                         padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
@@ -2752,9 +2752,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     );
                   }
 
-                  final diseaseNames = topDiseases.map((e) => e.key).toList();
+                  final diseaseNames = allDiseases.map((e) => e.key).toList();
                   final diseaseCounts =
-                      topDiseases.map((e) => e.value).toList();
+                      allDiseases.map((e) => e.value).toList();
                   final maxCount =
                       diseaseCounts.isNotEmpty
                           ? diseaseCounts.reduce((a, b) => a > b ? a : b)
@@ -2802,42 +2802,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ),
                             ),
                             bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: isSmallScreen ? 60 : 80,
-                                getTitlesWidget: (value, meta) {
-                                  int idx = value.toInt();
-                                  if (idx >= 0 && idx < diseaseNames.length) {
-                                    // Truncate long disease names for better display
-                                    final name = diseaseNames[idx];
-                                    // Truncate to 15 characters and add ellipsis
-                                    final displayName =
-                                        name.length > 15
-                                            ? '${name.substring(0, 15)}...'
-                                            : name;
-                                    return Padding(
-                                      padding: const EdgeInsets.only(top: 8.0),
-                                      child: Tooltip(
-                                        message:
-                                            name, // Show full name on hover
-                                        child: Text(
-                                          displayName,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            color: const Color(0xFF6B7280),
-                                            fontSize: isSmallScreen ? 9 : 11,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  return const SizedBox.shrink();
-                                },
-                                interval: 1,
-                              ),
+                              sideTitles: SideTitles(showTitles: false),
                             ),
                             topTitles: AxisTitles(
                               sideTitles: SideTitles(showTitles: false),
